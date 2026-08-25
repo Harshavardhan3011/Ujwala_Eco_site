@@ -52,7 +52,7 @@ export default function ProductDetailPage() {
         const data = await res.json();
         if (data.product) {
           setProduct(data.product);
-          setSelectedImage(data.product.images[0]?.imageUrl || '/uploads/b1.jpeg');
+          setSelectedImage(data.product.images[0]?.imageUrl || '/bags/b1.jpeg');
           setQuantity(data.product.minOrderQuantity || 1);
         }
         if (data.relatedProducts) {

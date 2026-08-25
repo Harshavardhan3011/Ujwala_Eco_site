@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const db = new PrismaClient();
 
@@ -9,31 +10,20 @@ async function run() {
     const imgCount = await db.productImage.count();
 
     console.log('=== DATABASE COUNTS ===');
-    console.log('categories:', catCount);
-    console.log('products:', prodCount);
-    console.log('featured products:', featuredCount);
-    console.log('product images:', imgCount);
+    console.log('categories:', catCount, '| products:', prodCount, '| featured:', featuredCount, '| images:', imgCount);
 
     if (catCount > 0) {
       const cats = await db.category.findMany({ include: { _count: { select: { products: true } } } });
       console.log('\n=== CATEGORIES ===');
-      cats.forEach(c => console.log(' -', c.name, '| isActive:', c.isActive, '| products:', c._count.products, '| image:', c.image));
+      cats.forEach(c => console.log(' -', c.name, '| image:', c.image, '| products:', c._count.products));
     }
 
-    if (prodCount > 0) {
-      const prods = await db.product.findMany({
-        take: 5,
-        include: { images: { take: 1 }, category: true },
-      });
-      console.log('\n=== PRODUCTS (first 5) ===');
-      prods.forEach(p => console.log(
-        ' -', p.name, '\n   price:', p.price, '| status:', p.productStatus,
-        '| isFeatured:', p.isFeatured, '| stock:', p.stockQuantity,
-        '| images:', '| img0:', p.images[0]?.imageUrl || 'NO IMAGE', '| cat:', p.category?.name
-      ));
-    }
-
-    console.log('\nDB_URL resolves to: dev.db at', process.cwd());
+    const prods = await db.product.findMany({ take: 5, include: { images: { take: 2 } } });
+    console.log('\n=== PRODUCTS image sample ===');
+    prods.forEach(p => {
+      const imgs = p.images.map(i => i.imageUrl).join(', ');
+      console.log(' -', p.name, '| imgs:', imgs || 'NO IMAGES');
+    });
   } catch (err) {
     console.error('DB ERROR:', err.message);
   } finally {

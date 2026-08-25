@@ -11,7 +11,7 @@ export default function AdminCategoriesPage() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [image, setImage] = useState('/uploads/b1.jpeg');
+  const [image, setImage] = useState('/bags/b1.jpeg');
   const [displayOrder, setDisplayOrder] = useState('1');
 
   const fetchCategories = async () => {
@@ -77,7 +77,7 @@ export default function AdminCategoriesPage() {
             setEditingId(null);
             setName('');
             setDescription('');
-            setImage('/uploads/b1.jpeg');
+            setImage('/bags/b1.jpeg');
             setDisplayOrder(String(categories.length + 1));
             setIsModalOpen(true);
           }}
@@ -102,7 +102,7 @@ export default function AdminCategoriesPage() {
             {categories.map((c) => (
               <tr key={c.id} className="border-b border-eco-50 hover:bg-canvas-50">
                 <td className="py-3 px-4 flex items-center gap-3">
-                  <img src={c.image || '/uploads/b1.jpeg'} alt="" className="w-9 h-9 object-cover rounded-lg" />
+                  <img src={c.image || '/bags/b1.jpeg'} alt="" className="w-9 h-9 object-cover rounded-lg" />
                   <span className="font-bold text-slate-900">{c.name}</span>
                 </td>
                 <td className="py-3 px-4 font-mono text-slate-500">{c.slug}</td>
@@ -114,7 +114,7 @@ export default function AdminCategoriesPage() {
                       setEditingId(c.id);
                       setName(c.name);
                       setDescription(c.description || '');
-                      setImage(c.image || '/uploads/b1.jpeg');
+                      setImage(c.image || '/bags/b1.jpeg');
                       setDisplayOrder(String(c.displayOrder));
                       setIsModalOpen(true);
                     }}

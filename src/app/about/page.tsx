@@ -83,10 +83,10 @@ export default function AboutPage() {
           Our Manufacturing Unit & Quality Standards
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <img src="/uploads/m1.jpeg" alt="Unit photo 1" className="rounded-xl aspect-square object-cover" />
-          <img src="/uploads/m2.jpeg" alt="Unit photo 2" className="rounded-xl aspect-square object-cover" />
-          <img src="/uploads/m3.jpeg" alt="Unit photo 3" className="rounded-xl aspect-square object-cover" />
-          <img src="/uploads/m4.jpeg" alt="Unit photo 4" className="rounded-xl aspect-square object-cover" />
+          <img src="/bags/m1.jpeg" alt="Unit photo 1" className="rounded-xl aspect-square object-cover" />
+          <img src="/bags/m2.jpeg" alt="Unit photo 2" className="rounded-xl aspect-square object-cover" />
+          <img src="/bags/m3.jpeg" alt="Unit photo 3" className="rounded-xl aspect-square object-cover" />
+          <img src="/bags/m4.jpeg" alt="Unit photo 4" className="rounded-xl aspect-square object-cover" />
         </div>
       </div>
     </div>

@@ -17,7 +17,7 @@ export const QuickViewModal = ({ product, onClose }: QuickViewModalProps) => {
   const { isInWishlist, toggleWishlist } = useWishlist();
 
   const [selectedImage, setSelectedImage] = useState(
-    product.images[0]?.imageUrl || '/uploads/b1.jpeg'
+    product.images[0]?.imageUrl || '/bags/b1.jpeg'
   );
   const [quantity, setQuantity] = useState(product.minOrderQuantity || 1);
   const [customizationNotes, setCustomizationNotes] = useState('');

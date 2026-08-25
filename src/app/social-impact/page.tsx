@@ -6,18 +6,18 @@ import { Heart, BookOpen, Award, Users, ArrowRight } from 'lucide-react';
 
 export default function SocialImpactPage() {
   const trustImages = [
-    '/uploads/e1.jpeg',
-    '/uploads/e2.jpeg',
-    '/uploads/e3.jpeg',
-    '/uploads/e4.jpeg',
-    '/uploads/e5.jpeg',
-    '/uploads/e6.jpeg',
-    '/uploads/e7.jpeg',
-    '/uploads/e8.jpeg',
-    '/uploads/e9.jpeg',
-    '/uploads/e10.jpeg',
-    '/uploads/e11.jpeg',
-    '/uploads/e12.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e1.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e2.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e3.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e4.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e5.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e6.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e7.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e8.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e9.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e10.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e11.jpeg',
+    '/Ujwala _Educational_&_Social_Trust/e12.jpeg',
   ];
 
   return (

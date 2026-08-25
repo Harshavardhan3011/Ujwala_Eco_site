@@ -174,7 +174,7 @@ export const Header = () => {
                   className="flex items-center gap-3 p-2.5 hover:bg-eco-50 transition-colors border-b border-eco-50 last:border-none"
                 >
                   <img
-                    src={p.images[0]?.imageUrl || '/uploads/b1.jpeg'}
+                    src={p.images[0]?.imageUrl || '/bags/b1.jpeg'}
                     alt={p.name}
                     className="w-10 h-10 object-cover rounded-lg"
                   />

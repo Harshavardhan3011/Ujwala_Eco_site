@@ -33,7 +33,7 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
   const [isAdding, setIsAdding] = useState(false);
   const [addedSuccess, setAddedSuccess] = useState(false);
 
-  const primaryImage = product.images[0]?.imageUrl || '/uploads/b1.jpeg';
+  const primaryImage = product.images[0]?.imageUrl || '/bags/b1.jpeg';
   const secondaryImage = product.images[1]?.imageUrl || primaryImage;
 
   const inWishlist = isInWishlist(product.id);

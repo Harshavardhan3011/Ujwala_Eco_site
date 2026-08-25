@@ -8,21 +8,21 @@ export default function GalleryPage() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const galleryItems = [
-    { src: '/uploads/b1.jpeg', category: 'products', title: 'Everyday Jute Tote Bag' },
-    { src: '/uploads/b3.jpeg', category: 'products', title: 'Custom Printed Return Gift Bag' },
-    { src: '/uploads/b5.jpeg', category: 'products', title: 'Zari Border Gift Bag' },
-    { src: '/uploads/b18.jpeg', category: 'products', title: 'Solid Brass Diya Set' },
-    { src: '/uploads/b22.jpeg', category: 'products', title: 'Etikoppaka Wooden Toy' },
-    { src: '/uploads/m1.jpeg', category: 'manufacturing', title: 'Manufacturing Workshop' },
-    { src: '/uploads/m2.jpeg', category: 'manufacturing', title: 'Stitching Unit' },
-    { src: '/uploads/m3.jpeg', category: 'manufacturing', title: 'Raw Material Processing' },
-    { src: '/uploads/o1.jpeg', category: 'opening', title: 'Opening Ceremony' },
-    { src: '/uploads/o2.jpeg', category: 'opening', title: 'Unit Inauguration' },
-    { src: '/uploads/o3.jpeg', category: 'opening', title: 'Opening Function' },
-    { src: '/uploads/e1.jpeg', category: 'social', title: 'Book Distribution Event' },
-    { src: '/uploads/e2.jpeg', category: 'social', title: 'Stationery Distribution' },
-    { src: '/uploads/e3.jpeg', category: 'social', title: 'Social Trust Function' },
-    { src: '/uploads/e4.jpeg', category: 'social', title: 'Merit Scholarship Award' },
+    { src: '/bags/b1.jpeg', category: 'products', title: 'Everyday Jute Tote Bag' },
+    { src: '/bags/b3.jpeg', category: 'products', title: 'Custom Printed Return Gift Bag' },
+    { src: '/bags/b5.jpeg', category: 'products', title: 'Zari Border Gift Bag' },
+    { src: '/bags/b18.jpeg', category: 'products', title: 'Solid Brass Diya Set' },
+    { src: '/bags/b22.jpeg', category: 'products', title: 'Etikoppaka Wooden Toy' },
+    { src: '/bags/m1.jpeg', category: 'manufacturing', title: 'Manufacturing Workshop' },
+    { src: '/bags/m2.jpeg', category: 'manufacturing', title: 'Stitching Unit' },
+    { src: '/bags/m3.jpeg', category: 'manufacturing', title: 'Raw Material Processing' },
+    { src: '/opening/o1.jpeg', category: 'opening', title: 'Opening Ceremony' },
+    { src: '/opening/o2.jpeg', category: 'opening', title: 'Unit Inauguration' },
+    { src: '/opening/o3.jpeg', category: 'opening', title: 'Opening Function' },
+    { src: '/Ujwala _Educational_&_Social_Trust/e1.jpeg', category: 'social', title: 'Book Distribution Event' },
+    { src: '/Ujwala _Educational_&_Social_Trust/e2.jpeg', category: 'social', title: 'Stationery Distribution' },
+    { src: '/Ujwala _Educational_&_Social_Trust/e3.jpeg', category: 'social', title: 'Social Trust Function' },
+    { src: '/Ujwala _Educational_&_Social_Trust/e4.jpeg', category: 'social', title: 'Merit Scholarship Award' },
   ];
 
   const filteredItems = activeTab === 'all'

@@ -8,42 +8,29 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seeding...');
 
-  // 1. Ensure public/uploads directory exists and copy images
-  const targetUploadsDir = path.join(process.cwd(), 'public', 'uploads');
-  if (!fs.existsSync(targetUploadsDir)) {
-    fs.mkdirSync(targetUploadsDir, { recursive: true });
+  // 1. Verify canonical image folders exist under public/
+  // Images are stored directly in public/bags/, public/opening/, public/Ujwala_Educational_&_Social_Trust/
+  // No copying needed — these are the canonical source of truth
+  const bagsDir = path.join(process.cwd(), 'public', 'bags');
+  const openingDir = path.join(process.cwd(), 'public', 'opening');
+  const trustDir = path.join(process.cwd(), 'public', 'Ujwala _Educational_&_Social_Trust');
+
+  if (!fs.existsSync(bagsDir)) {
+    console.warn('⚠️  WARNING: public/bags/ directory not found. Product images may not display.');
+  } else {
+    const bagFiles = fs.readdirSync(bagsDir);
+    console.log(`✅ Found ${bagFiles.length} images in public/bags/ (b1-b25.jpeg, m1-m5.jpeg)`);
   }
 
-  const imageFolders = [
-    { src: path.join(process.cwd(), 'bags'), prefix: '' },
-    { src: path.join(process.cwd(), 'opening'), prefix: '' },
-    { src: path.join(process.cwd(), 'Ujwala Educational & Social Trust'), prefix: '' },
-  ];
+  // Ensure uploads/ folder exists for admin-uploaded images
+  const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('✅ Created public/uploads/ for admin-uploaded images');
+  }
 
-  imageFolders.forEach(({ src }) => {
-    if (fs.existsSync(src)) {
-      const files = fs.readdirSync(src);
-      files.forEach((file) => {
-        const srcFile = path.join(src, file);
-        const destFile = path.join(targetUploadsDir, file);
-        if (fs.lstatSync(srcFile).isFile()) {
-          fs.copyFileSync(srcFile, destFile);
-        }
-      });
-    }
-  });
+  console.log('✅ Image directory check complete');
 
-  // Copy WhatsApp images if they exist
-  const rootFiles = ['WhatsApp Image 2026-08-25 at 7.14.42 PM.jpeg', 'WhatsApp Image 2026-08-25 at 7.16.38 PM.jpeg'];
-  rootFiles.forEach((file) => {
-    const srcFile = path.join(process.cwd(), file);
-    if (fs.existsSync(srcFile)) {
-      const safeName = file.includes('7.14.42') ? 'founder-suguna.jpeg' : 'ujwala-banner.jpeg';
-      fs.copyFileSync(srcFile, path.join(targetUploadsDir, safeName));
-    }
-  });
-
-  console.log('✅ Image assets copied to /public/uploads');
 
   // 2. Clean existing records
   await prisma.review.deleteMany({});
@@ -121,49 +108,49 @@ async function main() {
       name: 'Jute Bags',
       slug: 'jute-bags',
       description: 'Durable, 100% natural, biodegradable everyday tote & shopping bags handcrafted by local women artisans.',
-      image: '/uploads/b1.jpeg',
+      image: '/bags/b1.jpeg',
       displayOrder: 1,
     },
     {
       name: 'Customized Jute Bags',
       slug: 'customized-jute-bags',
       description: 'Personalized jute bags tailored with custom logo printing, colors, and designs for special occasions & corporate branding.',
-      image: '/uploads/b3.jpeg',
+      image: '/bags/b3.jpeg',
       displayOrder: 2,
     },
     {
       name: 'Gift & Return Gift Bags',
       slug: 'gift-return-gift-bags',
       description: 'Elegant return gift pouches and decorative bags for weddings, housewarmings, engagements, and birthday celebrations.',
-      image: '/uploads/b5.jpeg',
+      image: '/bags/b5.jpeg',
       displayOrder: 3,
     },
     {
       name: 'Designer Jute Bags',
       slug: 'designer-jute-bags',
       description: 'Stylish printed jute handbags with padded handles, inner cotton lining, and waterproof coating.',
-      image: '/uploads/b10.jpeg',
+      image: '/bags/b10.jpeg',
       displayOrder: 4,
     },
     {
       name: 'Utility Bags & Pouches',
       slug: 'utility-bags-pouches',
       description: 'Multipurpose eco pouches, lunch boxes, bottle bags, and grocery totes designed for daily convenience.',
-      image: '/uploads/b4.jpeg',
+      image: '/bags/b4.jpeg',
       displayOrder: 5,
     },
     {
       name: 'Brass & German Silver Items',
       slug: 'brass-german-silver',
       description: 'Handcrafted traditional brass lamps, pooja accessories, and German silver return gift collectibles.',
-      image: '/uploads/b18.jpeg',
+      image: '/bags/b18.jpeg',
       displayOrder: 6,
     },
     {
       name: 'Etikoppaka Wooden Toys',
       slug: 'etikoppaka-wooden-toys',
       description: 'Authentic GI-tagged Etikoppaka lacquerware wooden toys crafted with natural vegetable dyes.',
-      image: '/uploads/b22.jpeg',
+      image: '/bags/b22.jpeg',
       displayOrder: 7,
     },
   ];
@@ -198,7 +185,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'jute tote, eco bag, reusable, shopping bag',
-      images: ['/uploads/b1.jpeg', '/uploads/b2.jpeg'],
+      images: ['/bags/b1.jpeg', '/bags/b2.jpeg'],
     },
     {
       name: 'Heavy-Duty Bulk Grocery Jute Carrier',
@@ -219,7 +206,7 @@ async function main() {
       isBestseller: false,
       productStatus: 'IN_STOCK',
       tags: 'grocery bag, large tote, heavy duty',
-      images: ['/uploads/b2.jpeg', '/uploads/b1.jpeg'],
+      images: ['/bags/b2.jpeg', '/bags/b1.jpeg'],
     },
     {
       name: 'Custom Printed Wedding Favor Jute Bag',
@@ -241,7 +228,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'wedding favor, custom bag, return gift, personalized',
-      images: ['/uploads/b3.jpeg', '/uploads/b5.jpeg'],
+      images: ['/bags/b3.jpeg', '/bags/b5.jpeg'],
     },
     {
       name: 'Compact Eco Zipper Lunch & Utility Bag',
@@ -262,7 +249,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'lunch bag, zipper pouch, office tote',
-      images: ['/uploads/b4.jpeg', '/uploads/b14.jpeg'],
+      images: ['/bags/b4.jpeg', '/bags/b14.jpeg'],
     },
     {
       name: 'Royal Golden Border Wedding Return Gift Bag',
@@ -283,7 +270,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'return gift, golden border, housewarming gift',
-      images: ['/uploads/b5.jpeg', '/uploads/b7.jpeg'],
+      images: ['/bags/b5.jpeg', '/bags/b7.jpeg'],
     },
     {
       name: 'Botanical Leaf Print Designer Handbag',
@@ -304,7 +291,7 @@ async function main() {
       isBestseller: false,
       productStatus: 'IN_STOCK',
       tags: 'designer tote, leaf print, handbag',
-      images: ['/uploads/b6.jpeg', '/uploads/b8.jpeg'],
+      images: ['/bags/b6.jpeg', '/bags/b8.jpeg'],
     },
     {
       name: 'Traditional Motif Printed Pooja Gift Bag',
@@ -325,7 +312,7 @@ async function main() {
       isBestseller: false,
       productStatus: 'IN_STOCK',
       tags: 'pooja bag, prasadam pouch, festival gift',
-      images: ['/uploads/b7.jpeg', '/uploads/b9.jpeg'],
+      images: ['/bags/b7.jpeg', '/bags/b9.jpeg'],
     },
     {
       name: 'Contemporary Color-Block Jute Shoulder Bag',
@@ -346,7 +333,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'shoulder bag, dual tone, designer',
-      images: ['/uploads/b8.jpeg', '/uploads/b10.jpeg'],
+      images: ['/bags/b8.jpeg', '/bags/b10.jpeg'],
     },
     {
       name: 'Drawstring Jute Jewelry & Coin Pouch',
@@ -367,7 +354,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'drawstring pouch, coin pouch, dry fruit bag',
-      images: ['/uploads/b9.jpeg', '/uploads/b13.jpeg'],
+      images: ['/bags/b9.jpeg', '/bags/b13.jpeg'],
     },
     {
       name: 'Multi-Compartment Shopping & Travel Jute Bag',
@@ -388,7 +375,7 @@ async function main() {
       isBestseller: false,
       productStatus: 'IN_STOCK',
       tags: 'travel bag, multi pocket, market tote',
-      images: ['/uploads/b10.jpeg', '/uploads/b11.jpeg'],
+      images: ['/bags/b10.jpeg', '/bags/b11.jpeg'],
     },
     {
       name: 'Custom Corporate Logo Printed Jute Conference Tote',
@@ -410,7 +397,7 @@ async function main() {
       isBestseller: false,
       productStatus: 'IN_STOCK',
       tags: 'corporate bag, conference tote, logo print',
-      images: ['/uploads/b11.jpeg', '/uploads/b12.jpeg'],
+      images: ['/bags/b11.jpeg', '/bags/b12.jpeg'],
     },
     {
       name: 'Elegant Peacock Print Return Gift Bag',
@@ -431,7 +418,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'peacock print, return gift, function tote',
-      images: ['/uploads/b12.jpeg', '/uploads/b15.jpeg'],
+      images: ['/bags/b12.jpeg', '/bags/b15.jpeg'],
     },
     {
       name: 'Traditional Brass Pooja Diya / Lamp Set',
@@ -452,7 +439,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'brass diya, pooja item, return gift brass',
-      images: ['/uploads/b18.jpeg', '/uploads/b17.jpeg'],
+      images: ['/bags/b18.jpeg', '/bags/b17.jpeg'],
     },
     {
       name: 'German Silver Embossed Pooja Bowl & Plate Set',
@@ -473,7 +460,7 @@ async function main() {
       isBestseller: false,
       productStatus: 'IN_STOCK',
       tags: 'german silver, return gift, pooja plate',
-      images: ['/uploads/b19.jpeg', '/uploads/b16.jpeg'],
+      images: ['/bags/b19.jpeg', '/bags/b16.jpeg'],
     },
     {
       name: 'Authentic Etikoppaka Lacquerware Wooden Dancing Doll',
@@ -494,7 +481,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'etikoppaka toy, wooden doll, handmade toy',
-      images: ['/uploads/b22.jpeg', '/uploads/b23.jpeg'],
+      images: ['/bags/b22.jpeg', '/bags/b23.jpeg'],
     },
     {
       name: 'Etikoppaka Handcrafted Wooden Kumkum Box Set',
@@ -515,7 +502,7 @@ async function main() {
       isBestseller: true,
       productStatus: 'IN_STOCK',
       tags: 'etikoppaka, kumkum box, wooden souvenir',
-      images: ['/uploads/b24.jpeg', '/uploads/b25.jpeg'],
+      images: ['/bags/b24.jpeg', '/bags/b25.jpeg'],
     },
   ];
 

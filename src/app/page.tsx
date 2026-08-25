@@ -110,24 +110,24 @@ export default function HomePage() {
             <div className="relative mx-auto max-w-md lg:max-w-none grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 <img
-                  src="/uploads/b1.jpeg"
+                  src="/bags/b1.jpeg"
                   alt="Everyday Jute Bag"
                   className="rounded-2xl shadow-2xl object-cover w-full h-64 border-2 border-eco-600/50"
                 />
                 <img
-                  src="/uploads/b5.jpeg"
+                  src="/bags/b5.jpeg"
                   alt="Return Gift Bag"
                   className="rounded-2xl shadow-xl object-cover w-full h-44 border-2 border-eco-600/50"
                 />
               </div>
               <div className="space-y-4 pt-8">
                 <img
-                  src="/uploads/b3.jpeg"
+                  src="/bags/b3.jpeg"
                   alt="Custom Printed Bag"
                   className="rounded-2xl shadow-xl object-cover w-full h-44 border-2 border-eco-600/50"
                 />
                 <img
-                  src="/uploads/b22.jpeg"
+                  src="/bags/b22.jpeg"
                   alt="Etikoppaka Toys"
                   className="rounded-2xl shadow-2xl object-cover w-full h-64 border-2 border-eco-600/50"
                 />
@@ -165,7 +165,7 @@ export default function HomePage() {
             >
               <div className="aspect-[4/3] bg-canvas-100 overflow-hidden relative">
                 <img
-                  src={cat.image || '/uploads/b1.jpeg'}
+                  src={cat.image || '/bags/b1.jpeg'}
                   alt={cat.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
@@ -401,7 +401,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {['/uploads/m1.jpeg', '/uploads/m2.jpeg', '/uploads/m3.jpeg', '/uploads/o1.jpeg', '/uploads/o2.jpeg', '/uploads/e1.jpeg'].map((img, idx) => (
+          {['/bags/m1.jpeg', '/bags/m2.jpeg', '/bags/m3.jpeg', '/opening/o1.jpeg', '/opening/o2.jpeg', '/Ujwala _Educational_&_Social_Trust/e1.jpeg'].map((img, idx) => (
             <div key={idx} className="aspect-square bg-canvas-100 rounded-xl overflow-hidden border border-eco-100 group relative">
               <img
                 src={img}

@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
         productName: item.product.name,
         productSku: item.product.sku,
         productSlug: item.product.slug,
-        image: item.product.images[0]?.imageUrl || '/uploads/b1.jpeg',
+        image: item.product.images[0]?.imageUrl || '/bags/b1.jpeg',
         price: unitPrice,
         originalPrice: item.product.price,
         quantity: item.quantity,
