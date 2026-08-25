@@ -4,7 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { LogIn, Lock, Mail, AlertCircle, Zap, Shield, UserCheck } from 'lucide-react';
+import { LogIn, Lock, Mail, AlertCircle } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
@@ -63,33 +63,6 @@ function LoginForm() {
           <AlertCircle className="w-4 h-4 shrink-0" /> {errorMessage}
         </div>
       )}
-
-      {/* Instant 1-Click Demo Fill & Login Buttons */}
-      <div className="p-4 bg-canvas-100 rounded-2xl border border-eco-200 text-xs space-y-2.5">
-        <div className="flex items-center gap-1.5 font-bold text-eco-900">
-          <Zap className="w-4 h-4 text-amber-500 fill-amber-500 animate-pulse" />
-          <span>Instant Demo Logins:</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => handleQuickLogin('admin@ujwalaeco.com', 'admin123')}
-            className="bg-eco-800 hover:bg-eco-900 text-white p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
-          >
-            <Shield className="w-3.5 h-3.5 text-jute-300" /> Admin Dashboard
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickLogin('customer@gmail.com', 'customer123')}
-            className="bg-jute-600 hover:bg-jute-700 text-white p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
-          >
-            <UserCheck className="w-3.5 h-3.5" /> Customer Account
-          </button>
-        </div>
-        <p className="text-[10px] text-slate-500 text-center">
-          Admin: <code className="font-bold text-slate-700">admin@ujwalaeco.com</code> / <code className="font-bold text-slate-700">admin123</code>
-        </p>
-      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
