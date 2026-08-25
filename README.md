@@ -58,11 +58,6 @@ A production-ready full-stack e-commerce web application built for **Ujwala Eco 
 
 ---
 
-## 🔑 Initial Default Admin Credentials
-
-- **Admin Login Page**: `/auth/login` or `/admin`
-- **Email**: `admin@ujwalaeco.com`
-- **Password**: `admin123`
 
 ---
 
@@ -98,13 +93,4 @@ A production-ready full-stack e-commerce web application built for **Ujwala Eco 
 
 ---
 
-## ⚙️ Environment Variables (`.env.local`)
 
-```env
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="ujwala_eco_products_super_secret_jwt_key_2026_prod"
-RAZORPAY_KEY_ID="rzp_test_ujwala_key"
-RAZORPAY_KEY_SECRET="ujwala_razorpay_secret_key"
-NEXT_PUBLIC_RAZORPAY_KEY_ID="rzp_test_ujwala_key"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-```
