@@ -4,6 +4,27 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const productId = searchParams.get('productId');
+
+    const where: any = { isApproved: true };
+    if (productId) where.productId = productId;
+
+    const reviews = await db.review.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return NextResponse.json({ reviews });
+  } catch (error) {
+    console.error('Fetch reviews error:', error);
+    return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = getAuthFromRequest(req);

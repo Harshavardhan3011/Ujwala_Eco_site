@@ -29,7 +29,9 @@ export async function GET(req: NextRequest) {
     });
 
     let subtotal = 0;
-    const items = cartItems.map((item) => {
+    const items = cartItems
+      .filter((item) => item.product != null)
+      .map((item) => {
       const unitPrice = item.product.discountPrice ?? item.product.price;
       const itemTotal = unitPrice * item.quantity;
       subtotal += itemTotal;

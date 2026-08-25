@@ -9,14 +9,22 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
     const category = searchParams.get('category') || '';
-    const minPrice = parseFloat(searchParams.get('minPrice') || '0');
-    const maxPrice = parseFloat(searchParams.get('maxPrice') || '100000');
-    const sort = searchParams.get('sort') || 'featured'; // 'price-low', 'price-high', 'newest', 'rating', 'featured'
+    const rawMinPrice = parseFloat(searchParams.get('minPrice') || '0');
+    const minPrice = isNaN(rawMinPrice) || rawMinPrice < 0 ? 0 : rawMinPrice;
+
+    const rawMaxPrice = parseFloat(searchParams.get('maxPrice') || '100000');
+    const maxPrice = isNaN(rawMaxPrice) || rawMaxPrice < 0 ? 100000 : rawMaxPrice;
+
+    const sort = searchParams.get('sort') || 'featured';
     const featured = searchParams.get('featured');
     const bestseller = searchParams.get('bestseller');
     const customizable = searchParams.get('customizable');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '24');
+
+    const rawPage = parseInt(searchParams.get('page') || '1');
+    const page = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
+
+    const rawLimit = parseInt(searchParams.get('limit') || '24');
+    const limit = isNaN(rawLimit) || rawLimit < 1 ? 24 : Math.min(rawLimit, 100);
 
     const where: any = {};
 
