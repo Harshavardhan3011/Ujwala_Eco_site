@@ -22,13 +22,14 @@ function ShopContent() {
   const category = searchParams.get('category') || '';
   const sort = searchParams.get('sort') || 'featured';
   const minPrice = searchParams.get('minPrice') || '0';
-  const maxPrice = searchParams.get('maxPrice') || '2000';
+  const maxPrice = searchParams.get('maxPrice') || '5000';
   const customizable = searchParams.get('customizable') || '';
   const page = searchParams.get('page') || '1';
 
   // Local filter inputs
   const [searchInput, setSearchInput] = useState(search);
   const [priceRange, setPriceRange] = useState(maxPrice);
+  const [maxProductPrice, setMaxProductPrice] = useState(5000);
 
   useEffect(() => {
     async function loadShopData() {
@@ -55,6 +56,11 @@ function ShopContent() {
         if (prodData.products) {
           setProducts(prodData.products);
           setPagination(prodData.pagination);
+          // Dynamically compute max price from all products for the slider
+          if (prodData.products.length > 0) {
+            const highestPrice = Math.max(...prodData.products.map((p: any) => p.price || 0));
+            if (highestPrice > maxProductPrice) setMaxProductPrice(highestPrice + 100);
+          }
         }
         if (catData.categories) {
           setCategories(catData.categories);
@@ -83,7 +89,7 @@ function ShopContent() {
 
   const handleResetFilters = () => {
     setSearchInput('');
-    setPriceRange('2000');
+    setPriceRange('5000');
     router.push('/shop');
   };
 
@@ -112,7 +118,7 @@ function ShopContent() {
             <h3 className="font-serif font-bold text-sm text-slate-900 flex items-center gap-1.5">
               <SlidersHorizontal className="w-4 h-4 text-eco-700" /> Filter Products
             </h3>
-            {(search || category || customizable || maxPrice !== '2000') && (
+            {(search || category || customizable || parseInt(maxPrice) < maxProductPrice) && (
               <button
                 onClick={handleResetFilters}
                 className="text-[11px] text-rose-600 font-bold hover:underline flex items-center gap-1"
@@ -180,8 +186,8 @@ function ShopContent() {
             </div>
             <input
               type="range"
-              min="100"
-              max="2000"
+              min="0"
+              max={maxProductPrice}
               step="50"
               value={priceRange}
               onChange={(e) => setPriceRange(e.target.value)}

@@ -68,6 +68,11 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
+            onError={(e) => {
+              console.warn('[Image 404] Failed to load product image:', primaryImage, 'for product:', product.name);
+              (e.target as HTMLImageElement).src = '/placeholder-product.svg';
+              (e.target as HTMLImageElement).onerror = null;
+            }}
           />
         </Link>
 

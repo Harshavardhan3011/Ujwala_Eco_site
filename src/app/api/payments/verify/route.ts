@@ -2,6 +2,8 @@ import { db } from '@/lib/db';
 import { verifyPaymentSignature } from '@/lib/razorpay';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json();
