@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { formatDate } from '@/lib/utils';
-import { UserCheck, UserPlus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { UserCheck, UserPlus, Trash2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 export default function SuperadminUsersPage() {
   const { user } = useAuth();
@@ -15,6 +15,7 @@ export default function SuperadminUsersPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
 
   const [formError, setFormError] = useState('');
@@ -238,14 +239,28 @@ export default function SuperadminUsersPage() {
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Initial Password</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-canvas-100 border border-eco-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-amber-600"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-canvas-100 border border-eco-200 rounded-xl py-2.5 pl-3 pr-10 text-xs focus:outline-none focus:ring-1 focus:ring-amber-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 rounded-md p-0.5 transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div>
