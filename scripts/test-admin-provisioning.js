@@ -1,7 +1,7 @@
 const { jwtVerify } = require('jose');
 require('dotenv').config({ path: '.env.local' });
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://ujwala-eco-site.vercel.app';
 const JWT_SECRET = process.env.JWT_SECRET || 'ujwala_eco_products_secret_2026';
 
 async function runTests() {
@@ -32,7 +32,7 @@ async function runTests() {
   // 2. Test Superadmin login to perform privileged operations
   console.log('\n--- SUPERADMIN AUTHENTICATION ---');
   const superadminEmail = process.env.ADMIN_EMAIL || 'harshavardhanvesalapu1@gmail.com';
-  const superadminPass = process.env.ADMIN_INITIAL_PASSWORD || 'Harsha@2026';
+  const superadminPass = process.env.SUPERADMIN_PASSWORD || process.env.ADMIN_INITIAL_PASSWORD || 'UjwalaSuperAdmin2026!';
 
   let superadminCookie = '';
   try {
