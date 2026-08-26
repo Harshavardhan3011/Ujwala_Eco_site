@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     const minPrice = isNaN(rawMinPrice) || rawMinPrice < 0 ? 0 : rawMinPrice;
 
     const rawMaxPrice = parseFloat(searchParams.get('maxPrice') || '100000');
-    const maxPrice = isNaN(rawMaxPrice) || rawMaxPrice < 0 ? 100000 : rawMaxPrice;
+    // If maxPrice is 0 or negative or NaN, ignore filter so it doesn't collapse query
+    const maxPrice = isNaN(rawMaxPrice) || rawMaxPrice <= 0 ? 100000 : rawMaxPrice;
 
     const sort = searchParams.get('sort') || 'featured';
     const featured = searchParams.get('featured');
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
     if (minPrice > 0) {
       query = query.gte('price', minPrice);
     }
-    if (maxPrice < 100000) {
+    if (maxPrice > 0 && maxPrice < 100000) {
       query = query.lte('price', maxPrice);
     }
 
@@ -60,12 +61,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Filter by category slug if provided
-    if (categorySlug) {
+    if (categorySlug && categorySlug !== 'all') {
       const { data: catData } = await db.from('categories').select('id').eq('slug', categorySlug).single();
       if (catData) {
         query = query.eq('category_id', catData.id);
       } else {
-        // Return empty result if category slug doesn't exist
         return NextResponse.json({
           products: [],
           pagination: { total: 0, page, limit, totalPages: 0 },
@@ -80,6 +80,8 @@ export async function GET(req: NextRequest) {
       query = query.order('price', { ascending: false });
     } else if (sort === 'featured') {
       query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
+    } else if (sort === 'newest') {
+      query = query.order('created_at', { ascending: false });
     } else {
       query = query.order('created_at', { ascending: false });
     }
@@ -103,7 +105,6 @@ export async function GET(req: NextRequest) {
         ? reviewsArr.reduce((acc: number, r: any) => acc + (r.rating || 0), 0) / totalReviews
         : 5;
 
-      // Format fields to camelCase if expected by frontend
       const {
         id, name, slug, sku, description, short_description, price, discount_price,
         stock_quantity, min_order_quantity, available_colors, available_sizes,
@@ -157,7 +158,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const total = count || formattedProducts.length;
+    const total = count !== null && count !== undefined ? count : formattedProducts.length;
 
     return NextResponse.json({
       products: formattedProducts,

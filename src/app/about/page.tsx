@@ -3,14 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { Heart, ShieldCheck, Users, MapPin, CheckCircle2, ArrowRight } from 'lucide-react';
-import { getStorageUrl } from '@/lib/storage';
+import { getStorageUrl, getFounderImageUrl } from '@/lib/storage';
 
 export default function AboutPage() {
   const unitImages = [
-    { src: getStorageUrl('products/m1.jpeg'), fallback: '/bags/m1.jpeg' },
-    { src: getStorageUrl('products/m2.jpeg'), fallback: '/bags/m2.jpeg' },
-    { src: getStorageUrl('products/m3.jpeg'), fallback: '/bags/m3.jpeg' },
-    { src: getStorageUrl('products/m4.jpeg'), fallback: '/bags/m4.jpeg' },
+    { src: getStorageUrl('products', 'm1.jpeg'), fallback: '/bags/m1.jpeg' },
+    { src: getStorageUrl('products', 'm2.jpeg'), fallback: '/bags/m2.jpeg' },
+    { src: getStorageUrl('products', 'm3.jpeg'), fallback: '/bags/m3.jpeg' },
+    { src: getStorageUrl('products', 'm4.jpeg'), fallback: '/bags/m4.jpeg' },
   ];
 
   return (
@@ -45,11 +45,11 @@ export default function AboutPage() {
 
         <div className="relative">
           <img
-            src={getStorageUrl('products/m1.jpeg')}
+            src={getFounderImageUrl('founder-suguna.jpeg')}
             alt="N. Suguna Founder"
             className="rounded-2xl shadow-xl w-full object-cover border-4 border-canvas-100"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/bags/m1.jpeg';
+              (e.target as HTMLImageElement).src = '/uploads/founder-suguna.jpeg';
               (e.target as HTMLImageElement).onerror = null;
             }}
           />

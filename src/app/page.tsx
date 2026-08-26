@@ -309,11 +309,11 @@ export default function HomePage() {
         <div className="bg-white rounded-3xl border border-eco-100 p-8 md:p-12 shadow-sm grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="relative">
             <img
-              src={getStorageUrl('products/m1.jpeg')}
+              src={getStorageUrl('founder/founder-suguna.jpeg')}
               alt="Founder N. Suguna"
               className="rounded-2xl shadow-xl w-full max-w-md mx-auto object-cover border-4 border-canvas-100"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/bags/m1.jpeg';
+                (e.target as HTMLImageElement).src = '/uploads/founder-suguna.jpeg';
                 (e.target as HTMLImageElement).onerror = null;
               }}
             />

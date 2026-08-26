@@ -1,48 +1,51 @@
 const http = require('http');
 
-function fetchUrl(urlPath) {
+function makeRequest(path) {
   return new Promise((resolve, reject) => {
-    http.get(`http://localhost:3000${urlPath}`, (res) => {
-      let data = '';
-      res.on('data', (chunk) => (data += chunk));
+    http.get(`http://localhost:3000${path}`, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
       res.on('end', () => {
         try {
-          resolve({ status: res.statusCode, data: JSON.parse(data) });
+          const json = JSON.parse(body);
+          resolve({ status: res.statusCode, data: json });
         } catch (e) {
-          resolve({ status: res.statusCode, raw: data });
+          resolve({ status: res.statusCode, body });
         }
       });
-    }).on('error', (err) => reject(err));
+    }).on('error', reject);
   });
 }
 
-async function runTests() {
-  console.log('Testing API Endpoints against local server...');
-  const endpoints = [
-    '/api/categories',
+async function testAll() {
+  console.log('Testing APIs locally on http://localhost:3000 ...\n');
+
+  const tests = [
+    '/api/products',
     '/api/products?featured=true&limit=8',
-    '/api/products?sort=featured&minPrice=0&maxPrice=2000&page=1&limit=12',
-    '/api/cart',
-    '/api/reviews',
-    '/api/site-settings'
+    '/api/products?sort=featured&minPrice=0&maxPrice=5000&page=1&limit=12',
+    '/api/categories',
   ];
 
-  let passed = 0;
-  for (const ep of endpoints) {
+  for (const path of tests) {
     try {
-      const res = await fetchUrl(ep);
-      if (res.status === 200) {
-        console.log(`✅ [200 OK] ${ep}`);
-        passed++;
-      } else {
-        console.error(`❌ [${res.status}] ${ep}`, res.data || res.raw);
+      const res = await makeRequest(path);
+      console.log(`GET ${path}`);
+      console.log(`Status: ${res.status}`);
+      if (res.data?.products) {
+        console.log(`Products returned: ${res.data.products.length} (Total in DB: ${res.data.pagination?.total})`);
+        if (res.data.products.length > 0) {
+          console.log(`  Sample 1: "${res.data.products[0].name}" (Price: ₹${res.data.products[0].price})`);
+          console.log(`  Sample 1 Image: ${res.data.products[0].images?.[0]?.imageUrl || 'No image'}`);
+        }
+      } else if (res.data?.categories) {
+        console.log(`Categories returned: ${res.data.categories.length}`);
       }
-    } catch (err) {
-      console.error(`❌ [ERROR] ${ep}: ${err.message}`);
+      console.log('--------------------------------------------------\n');
+    } catch (e) {
+      console.error(`Error requesting ${path}:`, e.message);
     }
   }
-
-  console.log(`\nResults: ${passed}/${endpoints.length} endpoints passed.`);
 }
 
-runTests();
+setTimeout(testAll, 3000);

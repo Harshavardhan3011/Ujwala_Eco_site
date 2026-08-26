@@ -7,6 +7,8 @@ import { QuickViewModal } from '@/components/ui/QuickViewModal';
 import { Search, Filter, SlidersHorizontal, ArrowUpDown, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 
+const DEFAULT_MAX_PRICE = 5000;
+
 function ShopContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -15,32 +17,42 @@ function ShopContent() {
   const [categories, setCategories] = useState<any[]>([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
 
-  // Filter States
+  // Filter States from URL
   const search = searchParams.get('search') || '';
   const category = searchParams.get('category') || '';
   const sort = searchParams.get('sort') || 'featured';
   const minPrice = searchParams.get('minPrice') || '0';
-  const maxPrice = searchParams.get('maxPrice') || '5000';
+  const rawMaxPrice = searchParams.get('maxPrice');
+  const maxPrice = rawMaxPrice && parseInt(rawMaxPrice) > 0 ? rawMaxPrice : DEFAULT_MAX_PRICE.toString();
   const customizable = searchParams.get('customizable') || '';
   const page = searchParams.get('page') || '1';
 
   // Local filter inputs
   const [searchInput, setSearchInput] = useState(search);
   const [priceRange, setPriceRange] = useState(maxPrice);
-  const [maxProductPrice, setMaxProductPrice] = useState(5000);
+  const maxProductPrice = DEFAULT_MAX_PRICE;
+
+  useEffect(() => {
+    setSearchInput(search);
+    setPriceRange(maxPrice);
+  }, [search, maxPrice]);
 
   useEffect(() => {
     async function loadShopData() {
       setIsLoading(true);
+      setHasError(false);
       try {
         const queryParams = new URLSearchParams();
         if (search) queryParams.set('search', search);
-        if (category) queryParams.set('category', category);
+        if (category && category !== 'all') queryParams.set('category', category);
         if (sort) queryParams.set('sort', sort);
-        if (minPrice) queryParams.set('minPrice', minPrice);
-        if (maxPrice) queryParams.set('maxPrice', maxPrice);
+        if (parseInt(minPrice) > 0) queryParams.set('minPrice', minPrice);
+        if (parseInt(maxPrice) > 0 && parseInt(maxPrice) < DEFAULT_MAX_PRICE) {
+          queryParams.set('maxPrice', maxPrice);
+        }
         if (customizable) queryParams.set('customizable', customizable);
         queryParams.set('page', page);
         queryParams.set('limit', '12');
@@ -50,23 +62,26 @@ function ShopContent() {
           fetch('/api/categories'),
         ]);
 
+        if (!prodRes.ok) throw new Error(`Product fetch failed with status ${prodRes.status}`);
+
         const prodData = await prodRes.json();
         const catData = await catRes.json();
 
         if (prodData.products) {
           setProducts(prodData.products);
-          setPagination(prodData.pagination);
-          // Dynamically compute max price from all products for the slider
-          if (prodData.products.length > 0) {
-            const highestPrice = Math.max(...prodData.products.map((p: any) => p.price || 0));
-            if (highestPrice > maxProductPrice) setMaxProductPrice(highestPrice + 100);
-          }
+          setPagination(prodData.pagination || { page: 1, totalPages: 1, total: prodData.products.length });
+        } else {
+          setProducts([]);
+          setPagination({ page: 1, totalPages: 1, total: 0 });
         }
+
         if (catData.categories) {
           setCategories(catData.categories);
         }
       } catch (err) {
         console.error('Shop fetch error:', err);
+        setHasError(true);
+        setProducts([]);
       } finally {
         setIsLoading(false);
       }
@@ -77,19 +92,20 @@ function ShopContent() {
   const updateFilters = (newParams: Record<string, string>) => {
     const current = new URLSearchParams(Array.from(searchParams.entries()));
     Object.entries(newParams).forEach(([key, val]) => {
-      if (val) {
+      if (val && val !== 'all' && (key !== 'maxPrice' || parseInt(val) < DEFAULT_MAX_PRICE)) {
         current.set(key, val);
       } else {
         current.delete(key);
       }
     });
     current.set('page', '1');
-    router.push(`/shop?${current.toString()}`);
+    const queryString = current.toString();
+    router.push(queryString ? `/shop?${queryString}` : '/shop');
   };
 
   const handleResetFilters = () => {
     setSearchInput('');
-    setPriceRange('5000');
+    setPriceRange(DEFAULT_MAX_PRICE.toString());
     router.push('/shop');
   };
 
@@ -105,7 +121,7 @@ function ShopContent() {
             Shop Catalog & Custom Orders
           </h1>
           <p className="text-xs md:text-sm text-eco-100">
-            Browse our complete collection of natural jute bags, custom printed return gifts, brass items, and Etikoppaka wooden toys. All prices database-driven.
+            Browse our complete collection of natural jute bags, custom printed return gifts, brass items, and Etikoppaka wooden toys from Supabase.
           </p>
         </div>
       </div>
@@ -118,7 +134,7 @@ function ShopContent() {
             <h3 className="font-serif font-bold text-sm text-slate-900 flex items-center gap-1.5">
               <SlidersHorizontal className="w-4 h-4 text-eco-700" /> Filter Products
             </h3>
-            {(search || category || customizable || parseInt(maxPrice) < maxProductPrice) && (
+            {(search || category || customizable || parseInt(priceRange) < DEFAULT_MAX_PRICE) && (
               <button
                 onClick={handleResetFilters}
                 className="text-[11px] text-rose-600 font-bold hover:underline flex items-center gap-1"
@@ -158,7 +174,7 @@ function ShopContent() {
               <button
                 onClick={() => updateFilters({ category: '' })}
                 className={`w-full text-left py-1.5 px-3 rounded-lg font-medium transition-colors ${
-                  !category ? 'bg-eco-100 text-eco-900 font-bold' : 'text-slate-600 hover:bg-canvas-100'
+                  !category || category === 'all' ? 'bg-eco-100 text-eco-900 font-bold' : 'text-slate-600 hover:bg-canvas-100'
                 }`}
               >
                 All Categories
@@ -186,14 +202,14 @@ function ShopContent() {
             </div>
             <input
               type="range"
-              min="0"
+              min="50"
               max={maxProductPrice}
               step="50"
               value={priceRange}
               onChange={(e) => setPriceRange(e.target.value)}
               onMouseUp={() => updateFilters({ maxPrice: priceRange })}
               onTouchEnd={() => updateFilters({ maxPrice: priceRange })}
-              className="w-full accent-eco-700"
+              className="w-full accent-eco-700 cursor-pointer"
             />
           </div>
 
@@ -231,7 +247,7 @@ function ShopContent() {
               <select
                 value={sort}
                 onChange={(e) => updateFilters({ sort: e.target.value })}
-                className="bg-canvas-100 border border-eco-200 rounded-xl py-1.5 px-3 text-xs font-semibold text-slate-800 focus:outline-none"
+                className="bg-canvas-100 border border-eco-200 rounded-xl py-1.5 px-3 text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
               >
                 <option value="featured">Featured First</option>
                 <option value="price-low">Price: Low to High</option>
@@ -248,6 +264,22 @@ function ShopContent() {
                 <div key={i} className="bg-white h-72 rounded-2xl animate-pulse" />
               ))}
             </div>
+          ) : hasError ? (
+            <div className="bg-white rounded-2xl border border-rose-100 p-12 text-center space-y-4">
+              <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto text-rose-600 font-bold text-xl">
+                ⚠️
+              </div>
+              <h3 className="font-serif font-bold text-lg text-slate-900">Unable to Load Products</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                There was a problem connecting to the product catalog. Please try again.
+              </p>
+              <button
+                onClick={handleResetFilters}
+                className="bg-eco-700 text-white text-xs font-bold px-6 py-2.5 rounded-full hover:bg-eco-800"
+              >
+                Retry & Reset Filters
+              </button>
+            </div>
           ) : products.length === 0 ? (
             <div className="bg-white rounded-2xl border border-eco-100 p-12 text-center space-y-4">
               <div className="w-16 h-16 bg-eco-50 rounded-full flex items-center justify-center mx-auto text-eco-700 font-bold text-xl">
@@ -259,7 +291,7 @@ function ShopContent() {
               </p>
               <button
                 onClick={handleResetFilters}
-                className="bg-eco-700 text-white text-xs font-bold px-6 py-2.5 rounded-full"
+                className="bg-eco-700 text-white text-xs font-bold px-6 py-2.5 rounded-full hover:bg-eco-800"
               >
                 Clear All Filters
               </button>

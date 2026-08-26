@@ -1,63 +1,64 @@
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujkhgvhqofdbqwgahslc.supabase.co').replace(/\/$/, '');
 
 /**
- * Returns a browser-accessible Supabase Storage URL for a given asset path or URL.
- * 
- * Supports:
- * - Full HTTP/HTTPS URLs (returned as is)
- * - Storage paths: 'products/b1.jpeg', 'openings/1.jpg', 'trusts/1.jpg'
- * - Legacy paths: '/bags/b1.jpeg', '/opening/1.jpg', '/Ujwala_Educational_&_Social_Trust/1.jpg'
- *
- * @param path - Asset path or full URL
- * @param bucket - Optional override bucket name (defaults to 'site-images' or path prefix)
+ * Resolves browser-accessible Supabase Storage URLs for assets in exact buckets:
+ * - 'founder'
+ * - 'products'
+ * - 'openings'
+ * - 'trusts'
  */
-export function getStorageUrl(path: string | null | undefined, defaultFallback = '/placeholder-product.svg'): string {
-  if (!path) return defaultFallback;
+export function getStorageUrl(bucketOrPath: string, filename?: string): string {
+  if (!bucketOrPath) return '/placeholder-product.svg';
 
-  // Return full HTTP/HTTPS URLs as is
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
-    return path;
+  // Return full HTTP/HTTPS/data URLs as is
+  if (bucketOrPath.startsWith('http://') || bucketOrPath.startsWith('https://') || bucketOrPath.startsWith('data:')) {
+    return bucketOrPath;
   }
 
-  // Clean leading slashes
-  let cleanPath = path.replace(/^\/+/, '');
+  let bucket = 'products';
+  let path = bucketOrPath;
 
-  // Convert legacy local paths to Supabase Storage structure
-  if (cleanPath.startsWith('bags/')) {
-    cleanPath = cleanPath.replace(/^bags\//, 'products/');
-  } else if (cleanPath.startsWith('opening/')) {
-    cleanPath = cleanPath.replace(/^opening\//, 'openings/');
-  } else if (cleanPath.startsWith('Ujwala_Educational_&_Social_Trust/')) {
-    cleanPath = cleanPath.replace(/^Ujwala_Educational_&_Social_Trust\//, 'trusts/');
+  if (filename) {
+    bucket = bucketOrPath;
+    path = filename;
+  } else {
+    let clean = bucketOrPath.replace(/^\/+/, '');
+    
+    // Normalize legacy paths
+    if (clean.startsWith('bags/')) clean = clean.replace(/^bags\//, 'products/');
+    else if (clean.startsWith('opening/')) clean = clean.replace(/^opening\//, 'openings/');
+    else if (clean.startsWith('Ujwala _Educational_&_Social_Trust/')) clean = clean.replace(/^Ujwala _Educational_&_Social_Trust\//, 'trusts/');
+    else if (clean.startsWith('uploads/')) clean = clean.replace(/^uploads\//, 'products/');
+
+    const parts = clean.split('/');
+    if (['founder', 'products', 'openings', 'trusts'].includes(parts[0])) {
+      bucket = parts[0];
+      path = parts.slice(1).join('/');
+    } else {
+      bucket = 'products';
+      path = clean;
+    }
   }
 
-  // If cleanPath starts with products/, openings/, or trusts/
-  // Format standard Supabase Storage Public URL:
-  // URL: https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
-  const parts = cleanPath.split('/');
-  const bucketName = parts[0]; // e.g. 'products', 'openings', 'trusts'
+  const cleanFilename = path.replace(/^\/+/, '');
 
-  // Standard public storage URL format
-  return `${SUPABASE_URL}/storage/v1/object/public/${cleanPath}`;
+  // Exact Supabase Public Storage URL format:
+  // https://<project>.supabase.co/storage/v1/object/public/<bucket>/<filename>
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${cleanFilename}`;
 }
 
-export function getProductImageUrl(path: string | null | undefined): string {
-  if (!path) return '/placeholder-product.svg';
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  
-  let clean = path.replace(/^\/+/, '');
-  if (!clean.startsWith('products/')) {
-    clean = `products/${clean.replace(/^bags\//, '')}`;
-  }
-  return getStorageUrl(clean);
+export function getFounderImageUrl(filename = 'founder-suguna.jpeg'): string {
+  return getStorageUrl('founder', filename);
+}
+
+export function getProductImageUrl(filename: string): string {
+  return getStorageUrl('products', filename.replace(/^products\//, '').replace(/^bags\//, ''));
 }
 
 export function getOpeningImageUrl(filename: string): string {
-  const clean = filename.replace(/^\/+/, '').replace(/^opening\//, '');
-  return getStorageUrl(`openings/${clean}`);
+  return getStorageUrl('openings', filename.replace(/^openings\//, '').replace(/^opening\//, ''));
 }
 
 export function getTrustImageUrl(filename: string): string {
-  const clean = filename.replace(/^\/+/, '').replace(/^Ujwala_Educational_&_Social_Trust\//, '');
-  return getStorageUrl(`trusts/${clean}`);
+  return getStorageUrl('trusts', filename.replace(/^trusts\//, '').replace(/^Ujwala _Educational_&_Social_Trust\//, ''));
 }

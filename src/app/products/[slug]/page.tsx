@@ -19,6 +19,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
+import { getStorageUrl } from '@/lib/storage';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -52,7 +53,7 @@ export default function ProductDetailPage() {
         const data = await res.json();
         if (data.product) {
           setProduct(data.product);
-          setSelectedImage(data.product.images[0]?.imageUrl || '/bags/b1.jpeg');
+          setSelectedImage(data.product.images?.[0]?.imageUrl || '/bags/b1.jpeg');
           setQuantity(data.product.minOrderQuantity || 1);
         }
         if (data.relatedProducts) {
@@ -134,7 +135,6 @@ export default function ProductDetailPage() {
       if (res.ok) {
         setReviewMessage('Thank you! Your review has been published.');
         setReviewComment('');
-        // Reload product details
         const updateRes = await fetch(`/api/products/${slug}`);
         const updateData = await updateRes.json();
         if (updateData.product) setProduct(updateData.product);
@@ -147,6 +147,8 @@ export default function ProductDetailPage() {
       setReviewSubmitting(false);
     }
   };
+
+  const displayMainImage = getStorageUrl('products', selectedImage);
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-12">
@@ -169,9 +171,13 @@ export default function ProductDetailPage() {
         <div className="space-y-4">
           <div className="aspect-square bg-canvas-100 rounded-2xl overflow-hidden border border-eco-200 relative group">
             <img
-              src={selectedImage}
+              src={displayMainImage}
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = selectedImage.startsWith('/bags/') ? selectedImage : '/placeholder-product.svg';
+                (e.target as HTMLImageElement).onerror = null;
+              }}
             />
             {product.isCustomizable && (
               <span className="absolute top-3 left-3 bg-jute-600 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-sm">
@@ -183,17 +189,28 @@ export default function ProductDetailPage() {
           {/* Gallery Thumbnails */}
           {product.images?.length > 1 && (
             <div className="flex gap-3 overflow-x-auto pb-2">
-              {product.images.map((img: any, idx: number) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedImage(img.imageUrl)}
-                  className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
-                    selectedImage === img.imageUrl ? 'border-eco-600 shadow-md' : 'border-transparent opacity-70'
-                  }`}
-                >
-                  <img src={img.imageUrl} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
+              {product.images.map((img: any, idx: number) => {
+                const thumbUrl = getStorageUrl('products', img.imageUrl);
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImage(img.imageUrl)}
+                    className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
+                      selectedImage === img.imageUrl ? 'border-eco-600 shadow-md' : 'border-transparent opacity-70'
+                    }`}
+                  >
+                    <img
+                      src={thumbUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = img.imageUrl.startsWith('/bags/') ? img.imageUrl : '/placeholder-product.svg';
+                        (e.target as HTMLImageElement).onerror = null;
+                      }}
+                    />
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

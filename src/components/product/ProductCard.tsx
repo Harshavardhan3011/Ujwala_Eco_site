@@ -23,7 +23,8 @@ export interface ProductCardProps {
     avgRating?: number;
     totalReviews?: number;
     category?: { name: string };
-    images: { imageUrl: string; altText?: string }[];
+    images?: { imageUrl: string; altText?: string }[];
+    image?: string;
   };
   onQuickView?: (product: any) => void;
 }
@@ -34,8 +35,8 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
   const [isAdding, setIsAdding] = useState(false);
   const [addedSuccess, setAddedSuccess] = useState(false);
 
-  const rawPrimaryImage = product.images[0]?.imageUrl || '/bags/b1.jpeg';
-  const primaryImage = getStorageUrl(rawPrimaryImage);
+  const rawPrimaryImage = product.images?.[0]?.imageUrl || product.image || '/bags/b1.jpeg';
+  const primaryImage = getStorageUrl('products', rawPrimaryImage);
 
   const inWishlist = isInWishlist(product.id);
 
@@ -70,7 +71,6 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
             onError={(e) => {
-              // Fallback to local /bags/ path if Supabase storage object isn't uploaded yet
               if (rawPrimaryImage.startsWith('/bags/')) {
                 (e.target as HTMLImageElement).src = rawPrimaryImage;
               } else {
