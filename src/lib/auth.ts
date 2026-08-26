@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ujwala_eco_products_secret_2026';
 
@@ -36,4 +35,12 @@ export function getAuthFromRequest(req: NextRequest): TokenPayload | null {
   const token = req.cookies.get('auth_token')?.value || req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!token) return null;
   return verifyToken(token);
+}
+
+export function verifyAdminFromRequest(req: NextRequest): TokenPayload | null {
+  const session = getAuthFromRequest(req);
+  if (!session || !session.role || session.role.toLowerCase() !== 'admin') {
+    return null;
+  }
+  return session;
 }

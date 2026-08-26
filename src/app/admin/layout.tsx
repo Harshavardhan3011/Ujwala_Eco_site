@@ -20,13 +20,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'ADMIN')) {
-      router.push('/auth/login?redirect=/admin');
-    }
-  }, [user, isLoading, router]);
+  const isLoginPage = pathname === '/admin/login';
 
-  if (isLoading || !user || user.role !== 'ADMIN') {
+  useEffect(() => {
+    if (!isLoginPage && !isLoading && (!user || user.role?.toLowerCase() !== 'admin')) {
+      router.push('/admin/login');
+    }
+  }, [user, isLoading, router, pathname, isLoginPage]);
+
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  if (isLoading || !user || user.role?.toLowerCase() !== 'admin') {
     return (
       <div className="container mx-auto px-4 py-16 text-center text-xs font-bold text-slate-500 space-y-2">
         <ShieldCheck className="w-8 h-8 text-eco-700 mx-auto animate-bounce" />

@@ -1,39 +1,39 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { verifyToken } from '@/lib/auth';
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  const { pathname } = request.nextUrl;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
+  // 1. Protect /admin routes (except /admin/login)
+  if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
+    const token = request.cookies.get('auth_token')?.value || request.headers.get('Authorization')?.replace('Bearer ', '');
+    const session = token ? verifyToken(token) : null;
+
+    if (!session || !session.role || session.role.toLowerCase() !== 'admin') {
+      const loginUrl = new URL('/admin/login', request.url);
+      return NextResponse.redirect(loginUrl);
     }
-  );
+  }
 
-  await supabase.auth.getUser();
+  // 2. Protect /api/admin/* API routes
+  if (pathname.startsWith('/api/admin/')) {
+    const token = request.cookies.get('auth_token')?.value || request.headers.get('Authorization')?.replace('Bearer ', '');
+    const session = token ? verifyToken(token) : null;
 
-  return supabaseResponse;
+    if (!session || !session.role || session.role.toLowerCase() !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 401 }
+      );
+    }
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/admin/:path*',
+    '/api/admin/:path*',
   ],
 };

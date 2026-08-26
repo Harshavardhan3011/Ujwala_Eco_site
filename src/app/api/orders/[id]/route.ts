@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { getAuthFromRequest } from '@/lib/auth';
+import { getAuthFromRequest, verifyAdminFromRequest } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const order = orders[0];
 
     // Authorization check
-    if (session.role !== 'ADMIN' && order.user_id !== session.userId) {
+    if (session.role?.toLowerCase() !== 'admin' && order.user_id !== session.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -48,8 +48,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = getAuthFromRequest(req);
-    if (!session || session.role !== 'ADMIN') {
+    const session = verifyAdminFromRequest(req);
+    if (!session) {
       return NextResponse.json({ error: 'Admin authorization required' }, { status: 403 });
     }
 

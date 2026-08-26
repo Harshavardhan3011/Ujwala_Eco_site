@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { getAuthFromRequest } from '@/lib/auth';
+import { getAuthFromRequest, verifyAdminFromRequest } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -39,8 +39,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getAuthFromRequest(req);
-    if (!session || session.role !== 'ADMIN') {
+    const session = verifyAdminFromRequest(req);
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized admin access required' }, { status: 403 });
     }
 

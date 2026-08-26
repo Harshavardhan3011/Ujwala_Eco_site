@@ -1,13 +1,13 @@
 import { db } from '@/lib/db';
-import { getAuthFromRequest } from '@/lib/auth';
+import { verifyAdminFromRequest } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getAuthFromRequest(req);
-    if (!session || session.role !== 'ADMIN') {
+    const admin = verifyAdminFromRequest(req);
+    if (!admin) {
       return NextResponse.json({ error: 'Admin authorization required' }, { status: 403 });
     }
 
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const { data: paidOrders } = await db.from('orders').select('total_amount').eq('payment_status', 'PAID');
     const totalRevenue = (paidOrders || []).reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
 
-    const { count: totalCustomers } = await db.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'CUSTOMER');
+    const { count: totalCustomers } = await db.from('profiles').select('*', { count: 'exact', head: true });
     const { count: totalProducts } = await db.from('products').select('*', { count: 'exact', head: true });
     const { count: lowStockProducts } = await db.from('products').select('*', { count: 'exact', head: true }).lte('stock_quantity', 10);
 
