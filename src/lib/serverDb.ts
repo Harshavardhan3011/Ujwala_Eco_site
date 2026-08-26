@@ -150,7 +150,7 @@ export async function createAdminAuthUserPrivileged(params: {
         `INSERT INTO auth.users (
           id, instance_id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at, role, aud
         ) VALUES (
-          gen_random_uuid(), '00000000-0000-0000-0000-000000000000', $1, crypt($2, gen_salt('bf')), NOW(),
+          gen_random_uuid(), '00000000-0000-0000-0000-000000000000', $1, crypt($2, gen_salt('bf', 10)), NOW(),
           json_build_object('name', $3::text, 'phone', $4::text, 'role', 'admin')::jsonb,
           NOW(), NOW(), 'authenticated', 'authenticated'
         ) RETURNING id;`,
