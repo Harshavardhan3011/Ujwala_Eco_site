@@ -55,7 +55,7 @@ function LoginForm() {
           🌱
         </div>
         <h1 className="font-serif font-bold text-2xl text-slate-900">Sign In to Ujwala Eco</h1>
-        <p className="text-xs text-slate-500">Access your account, order tracking & admin dashboard</p>
+        <p className="text-xs text-slate-500">Access your account and order tracking</p>
       </div>
 
       {errorMessage && (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -12,14 +12,239 @@ import {
   FileText,
   Settings,
   UserCheck,
-  ArrowLeft,
+  Users,
+  Star,
+  Boxes,
+  Image as ImageIcon,
+  Bell,
+  Menu,
+  X,
+  LogOut,
+  ChevronDown,
+  ExternalLink,
   ShieldCheck,
+  ArrowLeft,
 } from 'lucide-react';
 
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  superadminOnly?: boolean;
+}
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Operations',
+    items: [
+      { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+      { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+      { name: 'Custom Orders', href: '/admin/custom-orders', icon: FileText },
+      { name: 'Customers', href: '/admin/customers', icon: Users },
+    ],
+  },
+  {
+    label: 'Catalog',
+    items: [
+      { name: 'Products', href: '/admin/products', icon: Package },
+      { name: 'Categories', href: '/admin/categories', icon: FolderTree },
+      { name: 'Inventory', href: '/admin/inventory', icon: Boxes },
+      { name: 'Reviews', href: '/admin/reviews', icon: Star },
+    ],
+  },
+  {
+    label: 'Content',
+    items: [
+      { name: 'Media', href: '/admin/media', icon: ImageIcon },
+      { name: 'Settings', href: '/admin/site-settings', icon: Settings },
+    ],
+  },
+  {
+    label: 'Users',
+    items: [
+      { name: 'Manage Admins', href: '/admin/users', icon: UserCheck, superadminOnly: true },
+    ],
+  },
+];
+
+const PAGE_TITLES: Record<string, string> = {
+  '/admin': 'Dashboard',
+  '/admin/products': 'Products',
+  '/admin/categories': 'Categories',
+  '/admin/orders': 'Orders',
+  '/admin/custom-orders': 'Custom Orders',
+  '/admin/customers': 'Customers',
+  '/admin/inventory': 'Inventory',
+  '/admin/reviews': 'Reviews',
+  '/admin/media': 'Media Library',
+  '/admin/site-settings': 'Settings',
+  '/admin/users': 'User Management',
+};
+
+function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
+        active
+          ? 'bg-eco-700 text-white shadow-sm'
+          : 'text-eco-200 hover:bg-eco-800 hover:text-white'
+      }`}
+    >
+      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-eco-300 group-hover:text-white'}`} />
+      <span>{item.name}</span>
+    </Link>
+  );
+}
+
+function Sidebar({ isSuperAdmin, pathname, onNavClick }: {
+  isSuperAdmin: boolean;
+  pathname: string;
+  onNavClick?: () => void;
+}) {
+  const getActive = (href: string) => {
+    if (href === '/admin') return pathname === '/admin';
+    return pathname.startsWith(href);
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-4 py-5 border-b border-eco-800">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-eco-600 rounded-lg flex items-center justify-center text-white font-serif font-bold text-sm shrink-0">
+            U
+          </div>
+          <div>
+            <p className="text-white font-bold text-sm leading-tight">Ujwala Eco</p>
+            <p className="text-eco-400 text-[10px] font-medium">Admin Console</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Groups */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        {NAV_GROUPS.map((group) => {
+          const visibleItems = group.items.filter(
+            (item) => !item.superadminOnly || isSuperAdmin
+          );
+          if (visibleItems.length === 0) return null;
+          return (
+            <div key={group.label}>
+              <p className="text-[10px] font-bold text-eco-500 uppercase tracking-widest px-3 mb-2">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {visibleItems.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    active={getActive(item.href)}
+                    onClick={onNavClick}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Bottom: Back to store */}
+      <div className="px-3 py-4 border-t border-eco-800">
+        <Link
+          href="/shop"
+          className="flex items-center gap-2 px-3 py-2.5 text-eco-400 hover:text-eco-200 text-xs font-medium transition-colors"
+          onClick={onNavClick}
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          View Storefront
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function ProfileMenu({ user, logout }: { user: any; logout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const isSuperAdmin = user?.role?.toLowerCase() === 'superadmin';
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-eco-50 transition-colors"
+      >
+        <div className="w-8 h-8 rounded-full bg-eco-700 text-white font-bold text-sm flex items-center justify-center font-serif shrink-0">
+          {(user?.name || 'A')[0].toUpperCase()}
+        </div>
+        <div className="hidden sm:block text-left">
+          <p className="text-xs font-bold text-slate-900 leading-tight max-w-[120px] truncate">{user?.name}</p>
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+            isSuperAdmin
+              ? 'bg-amber-100 text-amber-800'
+              : 'bg-eco-100 text-eco-800'
+          }`}>
+            {isSuperAdmin ? 'SUPERADMIN' : 'ADMIN'}
+          </span>
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50">
+          <div className="px-4 py-2.5 border-b border-slate-100">
+            <p className="text-xs font-bold text-slate-900 truncate">{user?.name}</p>
+            <p className="text-[11px] text-slate-500 truncate">{user?.email}</p>
+          </div>
+          {isSuperAdmin && (
+            <Link
+              href="/admin/users"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-eco-50 hover:text-eco-800 transition-colors"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              User Management
+            </Link>
+          )}
+          <Link
+            href="/shop"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-eco-50 transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            View Storefront
+          </Link>
+          <div className="border-t border-slate-100 mt-1 pt-1">
+            <button
+              onClick={() => { setOpen(false); logout(); }}
+              className="flex items-center gap-2 w-full px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isLoginPage = pathname === '/admin/login';
   const roleLower = user?.role?.toLowerCase();
@@ -36,87 +261,98 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [user, isLoading, router, pathname, isLoginPage, isAuthorized, isSuperAdmin]);
 
-  if (isLoginPage) {
-    return <>{children}</>;
-  }
+  // Login page: render without any admin chrome
+  if (isLoginPage) return <>{children}</>;
 
+  // Auth loading / not authorized
   if (isLoading || !user || !isAuthorized) {
     return (
-      <div className="container mx-auto px-4 py-16 text-center text-xs font-bold text-slate-500 space-y-2">
-        <ShieldCheck className="w-8 h-8 text-eco-700 mx-auto animate-bounce" />
-        <p>Verifying Security Credentials...</p>
+      <div className="min-h-screen flex items-center justify-center bg-eco-950">
+        <div className="text-center space-y-3">
+          <ShieldCheck className="w-10 h-10 text-eco-400 mx-auto animate-pulse" />
+          <p className="text-eco-300 text-sm font-medium">Verifying credentials…</p>
+        </div>
       </div>
     );
   }
 
-  const adminNav = [
-    { name: 'Overview Stats', href: '/admin', icon: LayoutDashboard },
-    { name: 'Products Catalog', href: '/admin/products', icon: Package },
-    { name: 'Categories Manager', href: '/admin/categories', icon: FolderTree },
-    { name: 'Customer Orders', href: '/admin/orders', icon: ShoppingBag },
-    { name: 'Custom Order Requests', href: '/admin/custom-orders', icon: FileText },
-    { name: 'Site Settings', href: '/admin/site-settings', icon: Settings },
-  ];
-
-  if (isSuperAdmin) {
-    adminNav.push({ name: 'User Management', href: '/admin/users', icon: UserCheck });
+  // Breadcrumb / page title
+  let pageTitle = 'Dashboard';
+  for (const [pattern, title] of Object.entries(PAGE_TITLES)) {
+    if (pattern === '/admin' ? pathname === '/admin' : pathname.startsWith(pattern)) {
+      pageTitle = title;
+    }
   }
+  if (pathname.match(/^\/admin\/orders\/[^/]+$/)) pageTitle = 'Order Detail';
 
   return (
-    <div className="bg-canvas-100 min-h-screen">
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border border-eco-100 mb-6 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-eco-800 text-jute-300 font-bold flex items-center justify-center">
-              ⚙️
+    <div className="flex h-screen bg-canvas-100 overflow-hidden">
+      {/* ── Desktop Sidebar ── */}
+      <aside className="hidden lg:flex lg:flex-col w-56 bg-eco-950 shrink-0">
+        <Sidebar isSuperAdmin={isSuperAdmin} pathname={pathname} />
+      </aside>
+
+      {/* ── Mobile Sidebar Overlay ── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-eco-950 flex flex-col lg:hidden transform transition-transform duration-300 ease-in-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between px-4 py-4 border-b border-eco-800">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-eco-600 rounded-lg flex items-center justify-center text-white font-serif font-bold text-sm">
+              U
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-serif font-bold text-base text-slate-900">Admin Control Center</h1>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  isSuperAdmin ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-eco-100 text-eco-800'
-                }`}>
-                  {isSuperAdmin ? 'SUPERADMIN' : 'ADMIN'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">Ujwala Eco Products Management</p>
+            <span className="text-white font-bold text-sm">Ujwala Eco</span>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} className="text-eco-400 hover:text-white p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <Sidebar isSuperAdmin={isSuperAdmin} pathname={pathname} onNavClick={() => setSidebarOpen(false)} />
+      </aside>
+
+      {/* ── Main Content Column ── */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* TopBar */}
+        <header className="bg-white border-b border-eco-100 px-4 sm:px-6 h-14 flex items-center justify-between gap-4 shrink-0 z-30">
+          <div className="flex items-center gap-3">
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-eco-50 transition-colors"
+              aria-label="Open sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="text-slate-400 font-medium hidden sm:inline">Admin</span>
+              <span className="text-slate-300 hidden sm:inline">/</span>
+              <span className="font-semibold text-slate-800">{pageTitle}</span>
             </div>
           </div>
-          <Link
-            href="/shop"
-            className="text-xs font-bold text-eco-700 hover:underline flex items-center gap-1 bg-canvas-100 px-3 py-1.5 rounded-full border border-eco-200"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Storefront
-          </Link>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Admin Navigation Sidebar */}
-          <aside className="bg-white p-4 rounded-2xl border border-eco-100 shadow-xs h-fit space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-3 py-1">
-              Admin Menu
-            </span>
-            {adminNav.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-colors ${
-                    isActive ? 'bg-eco-700 text-white shadow-xs' : 'text-slate-700 hover:bg-canvas-100'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
-          </aside>
+          <div className="flex items-center gap-2">
+            {/* Notification bell (static indicator for now) */}
+            <button className="relative p-2 rounded-lg text-slate-500 hover:bg-eco-50 transition-colors">
+              <Bell className="w-5 h-5" />
+            </button>
+            {/* Profile */}
+            <ProfileMenu user={user} logout={logout} />
+          </div>
+        </header>
 
-          {/* Main Admin Content View */}
-          <main className="lg:col-span-4">{children}</main>
-        </div>
+        {/* Scrollable page content */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {children}
+        </main>
       </div>
     </div>
   );

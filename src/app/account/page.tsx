@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { User as UserIcon, Package, Heart, MapPin, LogOut } from 'lucide-react';
+import { Package, Heart, LogOut } from 'lucide-react';
 
 export default function AccountPage() {
   const { user, logout } = useAuth();
@@ -20,6 +20,8 @@ export default function AccountPage() {
     );
   }
 
+  const isAdminUser = ['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'].includes(user.role);
+
   return (
     <div className="container mx-auto px-4 py-10 space-y-8 max-w-4xl">
       <div className="bg-white p-8 rounded-3xl border border-eco-100 shadow-sm flex items-center justify-between">
@@ -35,15 +37,25 @@ export default function AccountPage() {
             </span>
           </div>
         </div>
-        <button
-          onClick={logout}
-          className="text-xs text-rose-600 font-bold hover:bg-rose-50 px-4 py-2 rounded-xl border border-rose-200 transition-colors flex items-center gap-1.5"
-        >
-          <LogOut className="w-4 h-4" /> Sign Out
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          {isAdminUser && (
+            <Link
+              href="/admin"
+              className="text-xs text-eco-700 font-semibold hover:text-eco-900 underline underline-offset-2 transition-colors"
+            >
+              → Administration
+            </Link>
+          )}
+          <button
+            onClick={logout}
+            className="text-xs text-rose-600 font-bold hover:bg-rose-50 px-4 py-2 rounded-xl border border-rose-200 transition-colors flex items-center gap-1.5"
+          >
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <Link
           href="/account/orders"
           className="bg-canvas-100 p-6 rounded-2xl border border-eco-100 hover:border-eco-400 transition-all space-y-2 group"
@@ -61,17 +73,6 @@ export default function AccountPage() {
           <h3 className="font-serif font-bold text-base text-slate-900">Saved Wishlist</h3>
           <p className="text-xs text-slate-500">View items saved for future purchase.</p>
         </Link>
-
-        {['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'].includes(user.role) && (
-          <Link
-            href="/admin"
-            className="bg-eco-900 text-white p-6 rounded-2xl border border-eco-800 hover:bg-eco-950 transition-all space-y-2 group"
-          >
-            <UserIcon className="w-8 h-8 text-jute-300 group-hover:scale-110 transition-transform" />
-            <h3 className="font-serif font-bold text-base text-white">Admin Dashboard</h3>
-            <p className="text-xs text-eco-200">Manage products, orders & site settings.</p>
-          </Link>
-        )}
       </div>
     </div>
   );
