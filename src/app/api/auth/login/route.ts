@@ -9,10 +9,12 @@ export async function POST(req: NextRequest) {
     const { email, password } = await req.json();
 
     if (!email || !password) {
+      console.log('LOGIN DIAGNOSTIC: Missing email or password');
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
     const cleanEmail = email.toLowerCase().trim();
+    console.log(`LOGIN DIAGNOSTIC: Attempting login for email=${cleanEmail}`);
 
     // Authenticate via Supabase Auth
     const { data: authData, error: authError } = await db.auth.signInWithPassword({
@@ -21,17 +23,25 @@ export async function POST(req: NextRequest) {
     });
 
     if (authError || !authData.user) {
+      console.log(`LOGIN DIAGNOSTIC: Supabase auth failure - ${authError?.message || 'No user returned'}`);
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
     const user = authData.user;
+    console.log(`LOGIN DIAGNOSTIC: Supabase auth success - userId=${user.id}`);
 
     // Fetch user profile
-    const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).single();
+    const { data: profile, error: profileError } = await db.from('profiles').select('*').eq('id', user.id).single();
 
-    const role = profile?.role || 'CUSTOMER';
+    if (profileError) {
+      console.log(`LOGIN DIAGNOSTIC: Profile fetch notice - ${profileError.message}`);
+    }
+
+    const role = profile?.role || 'customer';
     const name = profile?.name || user.user_metadata?.name || cleanEmail.split('@')[0];
     const phone = profile?.phone || user.user_metadata?.phone || null;
+
+    console.log(`LOGIN DIAGNOSTIC: Profile retrieved - role=${role}`);
 
     const token = signToken({
       userId: user.id,
@@ -60,9 +70,10 @@ export async function POST(req: NextRequest) {
       path: '/',
     });
 
+    console.log('LOGIN DIAGNOSTIC: Returning 200 success with auth_token cookie');
     return response;
   } catch (error: any) {
-    console.error('Login error:', error);
+    console.error('LOGIN DIAGNOSTIC: Exception during login:', error.message);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

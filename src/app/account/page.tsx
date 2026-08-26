@@ -62,7 +62,7 @@ export default function AccountPage() {
           <p className="text-xs text-slate-500">View items saved for future purchase.</p>
         </Link>
 
-        {user.role === 'ADMIN' && (
+        {['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'].includes(user.role) && (
           <Link
             href="/admin"
             className="bg-eco-900 text-white p-6 rounded-2xl border border-eco-800 hover:bg-eco-950 transition-all space-y-2 group"

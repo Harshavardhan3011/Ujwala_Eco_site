@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       user:profiles(name, email, phone)
     `).order('created_at', { ascending: false });
 
-    if (session.role?.toLowerCase() !== 'admin') {
+    if (!['admin', 'superadmin'].includes(session.role?.toLowerCase())) {
       query = query.eq('user_id', session.userId);
     }
 

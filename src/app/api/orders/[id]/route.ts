@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const order = orders[0];
 
     // Authorization check
-    if (session.role?.toLowerCase() !== 'admin' && order.user_id !== session.userId) {
+    if (!['admin', 'superadmin'].includes(session.role?.toLowerCase()) && order.user_id !== session.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 

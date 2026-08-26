@@ -239,7 +239,7 @@ export const Header = () => {
                       </span>
                     </div>
 
-                    {user.role === 'ADMIN' && (
+                    {['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'].includes(user.role) && (
                       <Link
                         href="/admin"
                         onClick={() => setIsAccountMenuOpen(false)}
