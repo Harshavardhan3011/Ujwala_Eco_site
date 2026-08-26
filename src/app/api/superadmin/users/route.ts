@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { verifySuperAdminFromRequest } from '@/lib/auth';
+import { upsertAdminProfilePrivileged, cleanupAuthUserPrivileged } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -7,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const superadmin = verifySuperAdminFromRequest(req);
   if (!superadmin) {
-    return NextResponse.json({ error: 'Superadmin access required' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden: Superadmin access required' }, { status: 403 });
   }
 
   try {
@@ -18,19 +19,19 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch admin users' }, { status: 500 });
     }
 
     return NextResponse.json({ users: users || [] });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to fetch admin users' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch admin users' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   const superadmin = verifySuperAdminFromRequest(req);
   if (!superadmin) {
-    return NextResponse.json({ error: 'Superadmin access required' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden: Superadmin access required' }, { status: 403 });
   }
 
   try {
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // 1. Create auth user via Supabase Auth API
+    // 1. Create Auth user in Supabase Auth
     const { data: authData, error: authError } = await db.auth.signUp({
       email: cleanEmail,
       password,
@@ -55,40 +56,49 @@ export async function POST(req: NextRequest) {
         data: {
           name,
           phone: phone || null,
-          role: 'admin', // ALWAYS assigned 'admin', never superadmin
+          role: 'admin', // Metadata passed to auth trigger
         },
       },
     });
 
-    if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 400 });
+    if (authError || !authData.user) {
+      const errMsg = authError?.message?.includes('already registered')
+        ? 'An account with this email already exists'
+        : 'Unable to create administrator authentication account';
+      return NextResponse.json({ error: errMsg }, { status: 400 });
     }
 
-    const user = authData.user;
-    if (!user) {
-      return NextResponse.json({ error: 'Failed to create admin auth user' }, { status: 500 });
-    }
+    const newUserId = authData.user.id;
 
-    // 2. Ensure profile in public.profiles is assigned role = 'admin'
-    const { data: profile, error: profileErr } = await db.from('profiles').upsert({
-      id: user.id,
+    // 2. Privileged server-side upsert on public.profiles to set role = 'admin' bypassing client RLS
+    const profileRes = await upsertAdminProfilePrivileged({
+      id: newUserId,
       name,
       email: cleanEmail,
       phone: phone || null,
-      role: 'admin', // Server explicitly assigns admin role
-      updated_at: new Date().toISOString(),
-    }).select('id, name, email, phone, role, created_at').single();
+    });
 
-    if (profileErr) {
-      return NextResponse.json({ error: profileErr.message }, { status: 500 });
+    if (!profileRes.success) {
+      console.error('[ADMIN_CREATE] Privileged profile creation failed. Cleaning up auth user...');
+      await cleanupAuthUserPrivileged(newUserId);
+      return NextResponse.json(
+        { error: 'Unable to create administrator. Please try again.' },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({
-      message: 'Admin account created successfully',
-      user: profile,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        message: 'Admin account created successfully',
+        user: profileRes.profile,
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
-    console.error('Create admin error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to create admin user' }, { status: 500 });
+    console.error('[ADMIN_CREATE] Unexpected exception:', error?.message);
+    return NextResponse.json(
+      { error: 'Unable to create administrator. Please try again.' },
+      { status: 500 }
+    );
   }
 }
