@@ -151,10 +151,10 @@ export async function createAdminAuthUserPrivileged(params: {
           id, instance_id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at, role, aud
         ) VALUES (
           gen_random_uuid(), '00000000-0000-0000-0000-000000000000', $1, crypt($2, gen_salt('bf')), NOW(),
-          json_build_object('name', $3, 'phone', $4, 'role', 'admin')::jsonb,
+          json_build_object('name', $3::text, 'phone', $4::text, 'role', 'admin')::jsonb,
           NOW(), NOW(), 'authenticated', 'authenticated'
         ) RETURNING id;`,
-        [cleanEmail, params.password, params.name, params.phone || null]
+        [cleanEmail, params.password, params.name || '', params.phone || '']
       );
 
       const userId = createUserRes.rows[0].id;
