@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { ArrowLeft, Package, MapPin, User, CreditCard, Clock, Loader2, AlertCircle, Check } from 'lucide-react';
 import { formatPrice, formatDate } from '@/lib/utils';
 
+import { useAdminPath } from '@/lib/useAdminPath';
+
 const ORDER_STATUS_COLORS: Record<string, string> = {
   PENDING:          'bg-amber-100 text-amber-800 border-amber-200',
   CONFIRMED:        'bg-blue-100 text-blue-800 border-blue-200',
@@ -20,6 +22,7 @@ const ORDER_STATUSES = ['PENDING','CONFIRMED','PROCESSING','PACKED','SHIPPED','O
 const PAYMENT_STATUSES = ['PENDING','PAID','FAILED','REFUNDED'];
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
+  const paths = useAdminPath();
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -78,7 +81,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   if (error || !order) {
     return (
       <div className="space-y-4">
-        <Link href="/admin/orders" className="flex items-center gap-2 text-sm text-eco-700 font-medium">
+        <Link href={paths.orders} className="flex items-center gap-2 text-sm text-eco-700 font-medium">
           <ArrowLeft className="w-4 h-4" />Back to Orders
         </Link>
         <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 text-sm">
@@ -94,7 +97,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     <div className="space-y-5 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/admin/orders" className="p-2 rounded-lg border border-eco-200 text-slate-600 hover:bg-eco-50 transition-colors">
+        <Link href={paths.orders} className="p-2 rounded-lg border border-eco-200 text-slate-600 hover:bg-eco-50 transition-colors">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1">

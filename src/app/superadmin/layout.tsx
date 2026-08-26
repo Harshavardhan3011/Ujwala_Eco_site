@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   FileText,
   Settings,
+  UserCheck,
   Users,
   Star,
   Boxes,
@@ -35,51 +36,58 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Overview',
     items: [
-      { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+      { name: 'Dashboard', href: '/superadmin', icon: LayoutDashboard },
     ],
   },
   {
     label: 'Catalog',
     items: [
-      { name: 'Products', href: '/admin/products', icon: Package },
-      { name: 'Categories', href: '/admin/categories', icon: FolderTree },
-      { name: 'Inventory', href: '/admin/inventory', icon: Boxes },
+      { name: 'Products', href: '/superadmin/products', icon: Package },
+      { name: 'Categories', href: '/superadmin/categories', icon: FolderTree },
+      { name: 'Inventory', href: '/superadmin/inventory', icon: Boxes },
     ],
   },
   {
     label: 'Orders',
     items: [
-      { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
-      { name: 'Custom Orders', href: '/admin/custom-orders', icon: FileText },
+      { name: 'Orders', href: '/superadmin/orders', icon: ShoppingBag },
+      { name: 'Custom Orders', href: '/superadmin/custom-orders', icon: FileText },
     ],
   },
   {
     label: 'Customers',
     items: [
-      { name: 'Customers', href: '/admin/customers', icon: Users },
-      { name: 'Reviews', href: '/admin/reviews', icon: Star },
+      { name: 'Customers', href: '/superadmin/customers', icon: Users },
+      { name: 'Reviews', href: '/superadmin/reviews', icon: Star },
     ],
   },
   {
     label: 'Content',
     items: [
-      { name: 'Media', href: '/admin/media', icon: ImageIcon },
-      { name: 'Settings', href: '/admin/site-settings', icon: Settings },
+      { name: 'Media', href: '/superadmin/media', icon: ImageIcon },
+      { name: 'Site Settings', href: '/superadmin/site-settings', icon: Settings },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { name: 'User Management', href: '/superadmin/users', icon: UserCheck },
     ],
   },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
-  '/admin': 'Dashboard',
-  '/admin/products': 'Products',
-  '/admin/categories': 'Categories',
-  '/admin/orders': 'Orders',
-  '/admin/custom-orders': 'Custom Orders',
-  '/admin/customers': 'Customers',
-  '/admin/inventory': 'Inventory',
-  '/admin/reviews': 'Reviews',
-  '/admin/media': 'Media Library',
-  '/admin/site-settings': 'Settings',
+  '/superadmin': 'Dashboard',
+  '/superadmin/products': 'Products',
+  '/superadmin/categories': 'Categories',
+  '/superadmin/orders': 'Orders',
+  '/superadmin/custom-orders': 'Custom Orders',
+  '/superadmin/customers': 'Customers',
+  '/superadmin/inventory': 'Inventory',
+  '/superadmin/reviews': 'Reviews',
+  '/superadmin/media': 'Media Library',
+  '/superadmin/site-settings': 'Site Settings',
+  '/superadmin/users': 'User Management',
 };
 
 function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
@@ -90,7 +98,7 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
       onClick={onClick}
       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
         active
-          ? 'bg-eco-700 text-white shadow-sm'
+          ? 'bg-amber-600 text-white shadow-sm'
           : 'text-eco-200 hover:bg-eco-800 hover:text-white'
       }`}
     >
@@ -102,7 +110,7 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
 
 function Sidebar({ pathname, onNavClick }: { pathname: string; onNavClick?: () => void }) {
   const getActive = (href: string) => {
-    if (href === '/admin') return pathname === '/admin';
+    if (href === '/superadmin') return pathname === '/superadmin';
     return pathname.startsWith(href);
   };
 
@@ -111,12 +119,12 @@ function Sidebar({ pathname, onNavClick }: { pathname: string; onNavClick?: () =
       {/* Logo */}
       <div className="px-4 py-5 border-b border-eco-800">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-eco-600 rounded-lg flex items-center justify-center text-white font-serif font-bold text-sm shrink-0">
+          <div className="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center text-white font-serif font-bold text-sm shrink-0 shadow-sm">
             U
           </div>
           <div>
             <p className="text-white font-bold text-sm leading-tight">Ujwala Eco</p>
-            <p className="text-eco-400 text-[10px] font-medium">Admin Operations</p>
+            <p className="text-amber-400 text-[10px] font-bold tracking-wide">System Administration</p>
           </div>
         </div>
       </div>
@@ -175,13 +183,13 @@ function ProfileMenu({ user, logout }: { user: any; logout: () => void }) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-eco-50 transition-colors"
       >
-        <div className="w-8 h-8 rounded-full bg-eco-700 text-white font-bold text-sm flex items-center justify-center font-serif shrink-0">
-          {(user?.name || 'A')[0].toUpperCase()}
+        <div className="w-8 h-8 rounded-full bg-amber-700 text-white font-bold text-sm flex items-center justify-center font-serif shrink-0">
+          {(user?.name || 'S')[0].toUpperCase()}
         </div>
         <div className="hidden sm:block text-left">
           <p className="text-xs font-bold text-slate-900 leading-tight max-w-[120px] truncate">{user?.name}</p>
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-eco-100 text-eco-800">
-            ADMIN
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+            SUPERADMIN
           </span>
         </div>
         <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -200,6 +208,14 @@ function ProfileMenu({ user, logout }: { user: any; logout: () => void }) {
           >
             <UserIcon className="w-3.5 h-3.5" />
             My Account
+          </Link>
+          <Link
+            href="/superadmin/users"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-4 py-2 text-xs text-amber-800 hover:bg-amber-50 font-bold transition-colors"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            User Management
           </Link>
           <Link
             href="/shop"
@@ -224,35 +240,32 @@ function ProfileMenu({ user, logout }: { user: any; logout: () => void }) {
   );
 }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function SuperadminLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isLoginPage = pathname === '/admin/login';
   const roleLower = user?.role?.toLowerCase();
 
   useEffect(() => {
-    if (!isLoginPage && !isLoading) {
+    if (!isLoading) {
       if (!user) {
         router.push('/admin/login');
-      } else if (roleLower === 'superadmin') {
-        router.push('/superadmin');
-      } else if (roleLower !== 'admin') {
+      } else if (roleLower === 'admin') {
+        router.push('/admin');
+      } else if (roleLower !== 'superadmin') {
         router.push('/admin/login');
       }
     }
-  }, [user, isLoading, router, pathname, isLoginPage, roleLower]);
+  }, [user, isLoading, router, roleLower]);
 
-  if (isLoginPage) return <>{children}</>;
-
-  if (isLoading || !user || roleLower !== 'admin') {
+  if (isLoading || !user || roleLower !== 'superadmin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-eco-950">
         <div className="text-center space-y-3">
-          <ShieldCheck className="w-10 h-10 text-eco-400 mx-auto animate-pulse" />
-          <p className="text-eco-300 text-sm font-medium">Verifying admin credentials…</p>
+          <ShieldCheck className="w-10 h-10 text-amber-400 mx-auto animate-pulse" />
+          <p className="text-amber-300 text-sm font-medium">Verifying superadmin credentials…</p>
         </div>
       </div>
     );
@@ -260,11 +273,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   let pageTitle = 'Dashboard';
   for (const [pattern, title] of Object.entries(PAGE_TITLES)) {
-    if (pattern === '/admin' ? pathname === '/admin' : pathname.startsWith(pattern)) {
+    if (pattern === '/superadmin' ? pathname === '/superadmin' : pathname.startsWith(pattern)) {
       pageTitle = title;
     }
   }
-  if (pathname.match(/^\/admin\/orders\/[^/]+$/)) pageTitle = 'Order Detail';
+  if (pathname.match(/^\/superadmin\/orders\/[^/]+$/)) pageTitle = 'Order Detail';
 
   return (
     <div className="flex h-screen bg-canvas-100 overflow-hidden">
@@ -287,10 +300,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         <div className="flex items-center justify-between px-4 py-4 border-b border-eco-800">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-eco-600 rounded-lg flex items-center justify-center text-white font-serif font-bold text-sm">
+            <div className="w-7 h-7 bg-amber-600 rounded-lg flex items-center justify-center text-white font-serif font-bold text-sm">
               U
             </div>
-            <span className="text-white font-bold text-sm">Ujwala Eco</span>
+            <span className="text-white font-bold text-sm">Superadmin Console</span>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-eco-400 hover:text-white p-1">
             <X className="w-5 h-5" />
@@ -311,7 +324,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-1.5 text-sm">
-              <span className="text-slate-400 font-medium hidden sm:inline">Admin</span>
+              <span className="text-amber-700 font-bold hidden sm:inline">Superadmin</span>
               <span className="text-slate-300 hidden sm:inline">/</span>
               <span className="font-semibold text-slate-800">{pageTitle}</span>
             </div>

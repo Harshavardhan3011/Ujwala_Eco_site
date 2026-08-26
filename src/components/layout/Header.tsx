@@ -241,11 +241,12 @@ export const Header = () => {
 
                     {['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'].includes(user.role) && (
                       <Link
-                        href="/admin"
+                        href={user.role?.toLowerCase() === 'superadmin' ? '/superadmin' : '/admin'}
                         onClick={() => setIsAccountMenuOpen(false)}
                         className="flex items-center gap-2 px-4 py-2 text-xs text-eco-800 hover:bg-eco-50 font-bold"
                       >
-                        <LayoutDashboard className="w-3.5 h-3.5 text-eco-700" /> Admin Dashboard
+                        <LayoutDashboard className="w-3.5 h-3.5 text-eco-700" />
+                        {user.role?.toLowerCase() === 'superadmin' ? 'Superadmin Dashboard' : 'Admin Dashboard'}
                       </Link>
                     )}
 

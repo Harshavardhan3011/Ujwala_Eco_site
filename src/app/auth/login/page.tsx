@@ -26,7 +26,14 @@ function LoginForm() {
     setIsSubmitting(false);
 
     if (res.success) {
-      router.push(redirect);
+      if (!searchParams.get('redirect')) {
+        const r = res.user?.role?.toLowerCase();
+        if (r === 'superadmin') router.push('/superadmin');
+        else if (r === 'admin') router.push('/admin');
+        else router.push('/account');
+      } else {
+        router.push(redirect);
+      }
     } else {
       setErrorMessage(res.error || 'Login failed');
     }
@@ -42,7 +49,14 @@ function LoginForm() {
     setIsSubmitting(false);
 
     if (res.success) {
-      router.push(redirect);
+      if (!searchParams.get('redirect')) {
+        const r = res.user?.role?.toLowerCase();
+        if (r === 'superadmin') router.push('/superadmin');
+        else if (r === 'admin') router.push('/admin');
+        else router.push('/account');
+      } else {
+        router.push(redirect);
+      }
     } else {
       setErrorMessage(res.error || 'Login failed');
     }

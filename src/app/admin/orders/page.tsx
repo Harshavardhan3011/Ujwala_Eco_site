@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { formatPrice, formatDate } from '@/lib/utils';
 
+import { useAdminPath } from '@/lib/useAdminPath';
+
 const ORDER_STATUS_COLORS: Record<string, string> = {
   PENDING:          'bg-amber-100 text-amber-800 border-amber-200',
   CONFIRMED:        'bg-blue-100 text-blue-800 border-blue-200',
@@ -31,6 +33,7 @@ const PAYMENT_STATUSES = ['PENDING','PAID','FAILED','REFUNDED'];
 const PAGE_SIZE = 15;
 
 export default function AdminOrdersPage() {
+  const paths = useAdminPath();
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -141,7 +144,7 @@ export default function AdminOrdersPage() {
                 </thead>
                 <tbody className="divide-y divide-eco-50">
                   {paginated.map((ord) => (
-                    <tr key={ord.id} className="hover:bg-canvas-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/orders/${ord.id}`}>
+                    <tr key={ord.id} className="hover:bg-canvas-50 transition-colors cursor-pointer" onClick={() => window.location.href = `${paths.orders}/${ord.id}`}>
                       <td className="py-3 px-4 font-semibold text-eco-800 text-xs">#{ord.orderNumber}</td>
                       <td className="py-3 px-4">
                         <p className="font-medium text-slate-900 text-xs truncate max-w-[140px]">{ord.shippingName}</p>
@@ -161,7 +164,7 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
                         <Link
-                          href={`/admin/orders/${ord.id}`}
+                          href={`${paths.orders}/${ord.id}`}
                           className="inline-flex items-center gap-1 text-xs text-eco-700 font-medium hover:text-eco-900 px-2.5 py-1.5 border border-eco-200 rounded-lg hover:bg-eco-50 transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" />

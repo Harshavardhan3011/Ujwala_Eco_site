@@ -40,7 +40,7 @@ export default function AccountPage() {
         <div className="flex flex-col items-end gap-2">
           {isAdminUser && (
             <Link
-              href="/admin"
+              href={user.role?.toLowerCase() === 'superadmin' ? '/superadmin' : '/admin'}
               className="text-xs text-eco-700 font-semibold hover:text-eco-900 underline underline-offset-2 transition-colors"
             >
               → Administration

@@ -5,10 +5,11 @@ import Link from 'next/link';
 import {
   ShoppingBag, DollarSign, Users, Package, AlertTriangle,
   FileText, TrendingUp, Clock, CheckCircle2, ArrowRight,
-  Boxes, MessageSquare, Plus, BarChart3,
+  Boxes, MessageSquare, Plus, BarChart3, UserCheck,
 } from 'lucide-react';
 import { formatPrice, formatDate } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { useAdminPath } from '@/lib/useAdminPath';
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
   PENDING:          'bg-amber-100 text-amber-800 border-amber-200',
@@ -19,13 +20,6 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
   OUT_FOR_DELIVERY: 'bg-teal-100 text-teal-800 border-teal-200',
   DELIVERED:        'bg-emerald-100 text-emerald-800 border-emerald-200',
   CANCELLED:        'bg-rose-100 text-rose-800 border-rose-200',
-};
-
-const PAYMENT_STATUS_COLORS: Record<string, string> = {
-  PENDING:  'bg-slate-100 text-slate-600',
-  PAID:     'bg-emerald-100 text-emerald-700',
-  FAILED:   'bg-rose-100 text-rose-700',
-  REFUNDED: 'bg-amber-100 text-amber-700',
 };
 
 const CUSTOM_STATUS_COLORS: Record<string, string> = {
@@ -77,11 +71,11 @@ function KPICard({ card }: { card: StatCard }) {
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
+  const paths = useAdminPath();
   const [stats, setStats] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [recentCustomOrders, setRecentCustomOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const isSuperAdmin = user?.role?.toLowerCase() === 'superadmin';
 
   useEffect(() => {
     async function loadStats() {
@@ -122,7 +116,7 @@ export default function AdminDashboardPage() {
       icon: DollarSign,
       iconColor: 'text-emerald-600',
       bgColor: 'bg-emerald-50',
-      href: '/admin/orders',
+      href: paths.orders,
     },
     {
       label: 'Total Orders',
@@ -130,7 +124,7 @@ export default function AdminDashboardPage() {
       icon: ShoppingBag,
       iconColor: 'text-eco-700',
       bgColor: 'bg-eco-50',
-      href: '/admin/orders',
+      href: paths.orders,
     },
     {
       label: 'Pending Orders',
@@ -138,7 +132,7 @@ export default function AdminDashboardPage() {
       icon: Clock,
       iconColor: 'text-amber-600',
       bgColor: 'bg-amber-50',
-      href: '/admin/orders',
+      href: paths.orders,
       urgent: (stats?.pendingOrders || 0) > 0,
     },
     {
@@ -147,7 +141,7 @@ export default function AdminDashboardPage() {
       icon: Package,
       iconColor: 'text-eco-700',
       bgColor: 'bg-eco-50',
-      href: '/admin/products',
+      href: paths.products,
     },
     {
       label: 'Customers',
@@ -155,7 +149,7 @@ export default function AdminDashboardPage() {
       icon: Users,
       iconColor: 'text-blue-600',
       bgColor: 'bg-blue-50',
-      href: '/admin/customers',
+      href: paths.customers,
     },
     {
       label: 'Low Stock',
@@ -163,7 +157,7 @@ export default function AdminDashboardPage() {
       icon: AlertTriangle,
       iconColor: 'text-rose-600',
       bgColor: 'bg-rose-50',
-      href: '/admin/inventory',
+      href: paths.inventory,
       urgent: (stats?.lowStockProducts || 0) > 0,
     },
   ];
@@ -193,7 +187,7 @@ export default function AdminDashboardPage() {
               <ShoppingBag className="w-4 h-4 text-eco-700" />
               <h2 className="font-semibold text-sm text-slate-900">Recent Orders</h2>
             </div>
-            <Link href="/admin/orders" className="text-xs font-medium text-eco-700 hover:text-eco-900 flex items-center gap-1">
+            <Link href={paths.orders} className="text-xs font-medium text-eco-700 hover:text-eco-900 flex items-center gap-1">
               View all <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -221,7 +215,7 @@ export default function AdminDashboardPage() {
                     <tr
                       key={ord.id}
                       className="hover:bg-canvas-50 cursor-pointer transition-colors"
-                      onClick={() => window.location.href = `/admin/orders/${ord.id}`}
+                      onClick={() => window.location.href = `${paths.orders}/${ord.id}`}
                     >
                       <td className="py-3 px-4 font-semibold text-eco-800">#{ord.orderNumber}</td>
                       <td className="py-3 px-4 text-slate-700 max-w-[120px] truncate">{ord.shippingName}</td>
@@ -250,11 +244,11 @@ export default function AdminDashboardPage() {
             </div>
             <div className="space-y-2">
               {[
-                { label: 'Add Product', href: '/admin/products', icon: Plus, color: 'bg-eco-700 hover:bg-eco-800 text-white' },
-                { label: 'View Orders', href: '/admin/orders', icon: ShoppingBag, color: 'bg-eco-50 hover:bg-eco-100 text-eco-800' },
-                { label: 'Custom Requests', href: '/admin/custom-orders', icon: FileText, color: 'bg-amber-50 hover:bg-amber-100 text-amber-800', badge: stats?.newCustomOrdersCount || 0 },
-                { label: 'Check Inventory', href: '/admin/inventory', icon: Boxes, color: 'bg-canvas-100 hover:bg-canvas-200 text-slate-700' },
-                ...(isSuperAdmin ? [{ label: 'Manage Admins', href: '/admin/users', icon: Users, color: 'bg-canvas-100 hover:bg-canvas-200 text-slate-700' }] : []),
+                { label: 'Add Product', href: paths.products, icon: Plus, color: 'bg-eco-700 hover:bg-eco-800 text-white' },
+                { label: 'View Orders', href: paths.orders, icon: ShoppingBag, color: 'bg-eco-50 hover:bg-eco-100 text-eco-800' },
+                { label: 'Custom Requests', href: paths.customOrders, icon: FileText, color: 'bg-amber-50 hover:bg-amber-100 text-amber-800', badge: stats?.newCustomOrdersCount || 0 },
+                { label: 'Check Inventory', href: paths.inventory, icon: Boxes, color: 'bg-canvas-100 hover:bg-canvas-200 text-slate-700' },
+                ...(paths.isSuper ? [{ label: 'User Management', href: '/superadmin/users', icon: UserCheck, color: 'bg-amber-600 hover:bg-amber-700 text-white' }] : []),
               ].map((action) => {
                 const Icon = action.icon;
                 return (
@@ -285,7 +279,7 @@ export default function AdminDashboardPage() {
                 <FileText className="w-4 h-4 text-jute-600" />
                 <h2 className="font-semibold text-sm text-slate-900">Custom Requests</h2>
               </div>
-              <Link href="/admin/custom-orders" className="text-xs font-medium text-eco-700 hover:text-eco-900 flex items-center gap-1">
+              <Link href={paths.customOrders} className="text-xs font-medium text-eco-700 hover:text-eco-900 flex items-center gap-1">
                 View all <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -299,7 +293,7 @@ export default function AdminDashboardPage() {
                 {recentCustomOrders.map((co) => (
                   <Link
                     key={co.id}
-                    href="/admin/custom-orders"
+                    href={paths.customOrders}
                     className="flex items-center justify-between px-5 py-3 hover:bg-canvas-50 transition-colors"
                   >
                     <div>

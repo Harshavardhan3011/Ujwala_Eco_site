@@ -21,17 +21,15 @@ export default function AdminLoginForm() {
     try {
       const res = await login(email, password);
 
-      if (res.success) {
-        // Fetch current user details to verify role server-side check
-        const meRes = await fetch('/api/auth/me');
-        const meData = await meRes.json();
-
-        const roleLower = meData?.user?.role?.toLowerCase();
-        if (meData?.user && (roleLower === 'admin' || roleLower === 'superadmin')) {
+      if (res.success && res.user) {
+        const roleLower = res.user.role?.toLowerCase();
+        if (roleLower === 'superadmin') {
+          router.push('/superadmin');
+          return;
+        } else if (roleLower === 'admin') {
           router.push('/admin');
           return;
         } else {
-          // If non-admin logged in, immediately log out and show error
           await logout();
           setErrorMessage('Invalid email or password.');
         }

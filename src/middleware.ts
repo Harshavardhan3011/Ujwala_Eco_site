@@ -24,6 +24,10 @@ function isSuperAdmin(role?: string): boolean {
   return role?.toLowerCase() === 'superadmin';
 }
 
+function isAdmin(role?: string): boolean {
+  return role?.toLowerCase() === 'admin';
+}
+
 function isAdminOrSuperAdmin(role?: string): boolean {
   const r = role?.toLowerCase();
   return r === 'admin' || r === 'superadmin';
@@ -37,41 +41,42 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Protect /admin/users route (SUPERADMIN ONLY)
-  if (pathname.startsWith('/admin/users')) {
-    const token =
-      request.cookies.get('auth_token')?.value ||
-      request.headers.get('Authorization')?.replace('Bearer ', '');
-    const session = token ? await verifyTokenEdge(token) : null;
+  // Helper to extract session token
+  const token =
+    request.cookies.get('auth_token')?.value ||
+    request.headers.get('Authorization')?.replace('Bearer ', '');
+  const session = token ? await verifyTokenEdge(token) : null;
 
-    if (!session || !isSuperAdmin(session.role)) {
-      const redirectUrl = new URL(session ? '/admin' : '/admin/login', request.url);
-      return NextResponse.redirect(redirectUrl);
+  // 2. Protect /superadmin routes (SUPERADMIN ONLY)
+  if (pathname.startsWith('/superadmin')) {
+    if (!session) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+    if (isAdmin(session.role)) {
+      return NextResponse.redirect(new URL('/admin', request.url));
+    }
+    if (!isSuperAdmin(session.role)) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
     }
     return NextResponse.next();
   }
 
-  // 3. Protect all other /admin routes (ADMIN or SUPERADMIN)
+  // 3. Protect /admin routes (ADMIN ONLY, SUPERADMIN REDIRECTS TO /superadmin)
   if (pathname.startsWith('/admin')) {
-    const token =
-      request.cookies.get('auth_token')?.value ||
-      request.headers.get('Authorization')?.replace('Bearer ', '');
-    const session = token ? await verifyTokenEdge(token) : null;
-
-    if (!session || !isAdminOrSuperAdmin(session.role)) {
-      const loginUrl = new URL('/admin/login', request.url);
-      return NextResponse.redirect(loginUrl);
+    if (!session) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+    if (isSuperAdmin(session.role)) {
+      return NextResponse.redirect(new URL('/superadmin', request.url));
+    }
+    if (!isAdmin(session.role)) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
     }
     return NextResponse.next();
   }
 
-  // 4. Protect /api/admin/users API routes (SUPERADMIN ONLY)
-  if (pathname.startsWith('/api/admin/users')) {
-    const token =
-      request.cookies.get('auth_token')?.value ||
-      request.headers.get('Authorization')?.replace('Bearer ', '');
-    const session = token ? await verifyTokenEdge(token) : null;
-
+  // 4. Protect /api/superadmin/* and /api/admin/users* API routes (SUPERADMIN ONLY)
+  if (pathname.startsWith('/api/superadmin') || pathname.startsWith('/api/admin/users')) {
     if (!session || !isSuperAdmin(session.role)) {
       return NextResponse.json(
         { error: 'Forbidden: Superadmin access required' },
@@ -81,13 +86,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 5. Protect all other /api/admin/* API routes (ADMIN or SUPERADMIN)
+  // 5. Protect all operational /api/admin/* API routes (ADMIN or SUPERADMIN)
   if (pathname.startsWith('/api/admin/')) {
-    const token =
-      request.cookies.get('auth_token')?.value ||
-      request.headers.get('Authorization')?.replace('Bearer ', '');
-    const session = token ? await verifyTokenEdge(token) : null;
-
     if (!session || !isAdminOrSuperAdmin(session.role)) {
       return NextResponse.json(
         { error: 'Unauthorized: Admin access required' },
@@ -103,6 +103,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/:path*',
+    '/superadmin/:path*',
     '/api/admin/:path*',
+    '/api/superadmin/:path*',
   ],
 };
