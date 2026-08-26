@@ -13,45 +13,57 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ items: [], subtotal: 0, shippingFee: 0, totalAmount: 0 });
     }
 
-    const where = session
-      ? { userId: session.userId }
-      : { sessionId };
+    let query = db.from('cart_items').select(`
+      *,
+      product:products(
+        id, name, sku, slug, price, discount_price, min_order_quantity, stock_quantity,
+        images:product_images(*)
+      )
+    `);
 
-    const cartItems = await db.cartItem.findMany({
-      where,
-      include: {
-        product: {
-          include: {
-            images: { orderBy: { displayOrder: 'asc' }, take: 1 },
-          },
-        },
-      },
-    });
+    if (session) {
+      query = query.eq('user_id', session.userId);
+    } else if (sessionId) {
+      query = query.eq('session_id', sessionId);
+    }
+
+    const { data: cartItems, error } = await query;
+
+    if (error) {
+      console.error('Cart fetch Supabase error:', error);
+      throw error;
+    }
 
     let subtotal = 0;
-    const items = cartItems
-      .filter((item) => item.product != null)
-      .map((item) => {
-      const unitPrice = item.product.discountPrice ?? item.product.price;
-      const itemTotal = unitPrice * item.quantity;
-      subtotal += itemTotal;
+    const items = (cartItems || [])
+      .filter((item: any) => item.product != null)
+      .map((item: any) => {
+        const prod = item.product;
+        const price = parseFloat(prod.price);
+        const discountPrice = prod.discount_price ? parseFloat(prod.discount_price) : null;
+        const unitPrice = discountPrice ?? price;
+        const itemTotal = unitPrice * item.quantity;
+        subtotal += itemTotal;
 
-      return {
-        id: item.id,
-        productId: item.productId,
-        productName: item.product.name,
-        productSku: item.product.sku,
-        productSlug: item.product.slug,
-        image: item.product.images[0]?.imageUrl || '/bags/b1.jpeg',
-        price: unitPrice,
-        originalPrice: item.product.price,
-        quantity: item.quantity,
-        minOrderQuantity: item.product.minOrderQuantity,
-        stockQuantity: item.product.stockQuantity,
-        customizationNotes: item.customizationNotes,
-        itemTotal,
-      };
-    });
+        const primaryImg = (prod.images || []).find((i: any) => i.is_primary) || prod.images?.[0];
+        const image = primaryImg ? primaryImg.image_url : '/bags/b1.jpeg';
+
+        return {
+          id: item.id,
+          productId: item.product_id,
+          productName: prod.name,
+          productSku: prod.sku,
+          productSlug: prod.slug,
+          image,
+          price: unitPrice,
+          originalPrice: price,
+          quantity: item.quantity,
+          minOrderQuantity: prod.min_order_quantity,
+          stockQuantity: prod.stock_quantity,
+          customizationNotes: item.customization_notes,
+          itemTotal,
+        };
+      });
 
     const shippingFee = subtotal > 1000 || subtotal === 0 ? 0 : 50;
     const totalAmount = subtotal + shippingFee;
@@ -77,20 +89,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid product or quantity' }, { status: 400 });
     }
 
-    const product = await db.product.findUnique({ where: { id: productId } });
-    if (!product) {
+    const { data: product, error: prodErr } = await db.from('products').select('*').eq('id', productId).single();
+    if (prodErr || !product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    if (quantity < product.minOrderQuantity) {
+    if (quantity < product.min_order_quantity) {
       return NextResponse.json({
-        error: `Minimum order quantity for this product is ${product.minOrderQuantity}`,
+        error: `Minimum order quantity for this product is ${product.min_order_quantity}`,
       }, { status: 400 });
     }
 
-    if (quantity > product.stockQuantity) {
+    if (quantity > product.stock_quantity) {
       return NextResponse.json({
-        error: `Only ${product.stockQuantity} items currently in stock`,
+        error: `Only ${product.stock_quantity} items currently in stock`,
       }, { status: 400 });
     }
 
@@ -98,31 +110,35 @@ export async function POST(req: NextRequest) {
     const activeSessionId = session ? null : (sessionId || 'guest-session');
 
     // Check if item already in cart
-    const existingItem = await db.cartItem.findFirst({
-      where: session
-        ? { userId, productId }
-        : { sessionId: activeSessionId, productId },
-    });
+    let checkQuery = db.from('cart_items').select('*').eq('product_id', productId);
+    if (session) {
+      checkQuery = checkQuery.eq('user_id', userId);
+    } else {
+      checkQuery = checkQuery.eq('session_id', activeSessionId);
+    }
+
+    const { data: existingItems } = await checkQuery;
+    const existingItem = existingItems && existingItems.length > 0 ? existingItems[0] : null;
 
     if (existingItem) {
-      const updated = await db.cartItem.update({
-        where: { id: existingItem.id },
-        data: {
-          quantity: quantity,
-          customizationNotes: customizationNotes ?? existingItem.customizationNotes,
-        },
-      });
+      const { data: updated, error: updateErr } = await db.from('cart_items').update({
+        quantity: quantity,
+        customization_notes: customizationNotes ?? existingItem.customization_notes,
+        updated_at: new Date().toISOString(),
+      }).eq('id', existingItem.id).select().single();
+
+      if (updateErr) throw updateErr;
       return NextResponse.json({ item: updated });
     } else {
-      const newItem = await db.cartItem.create({
-        data: {
-          userId,
-          sessionId: activeSessionId,
-          productId,
-          quantity,
-          customizationNotes,
-        },
-      });
+      const { data: newItem, error: createErr } = await db.from('cart_items').insert({
+        user_id: userId,
+        session_id: activeSessionId,
+        product_id: productId,
+        quantity,
+        customization_notes: customizationNotes,
+      }).select().single();
+
+      if (createErr) throw createErr;
       return NextResponse.json({ item: newItem }, { status: 201 });
     }
   } catch (error: any) {
@@ -138,10 +154,10 @@ export async function DELETE(req: NextRequest) {
     const session = getAuthFromRequest(req);
 
     if (itemId) {
-      await db.cartItem.delete({ where: { id: itemId } });
+      await db.from('cart_items').delete().eq('id', itemId);
       return NextResponse.json({ message: 'Item removed from cart' });
     } else if (session) {
-      await db.cartItem.deleteMany({ where: { userId: session.userId } });
+      await db.from('cart_items').delete().eq('user_id', session.userId);
       return NextResponse.json({ message: 'Cart cleared' });
     }
 

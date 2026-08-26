@@ -11,39 +11,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Admin authorization required' }, { status: 403 });
     }
 
-    const totalOrders = await db.order.count();
-    const pendingOrders = await db.order.count({ where: { orderStatus: 'PENDING' } });
-    const completedOrders = await db.order.count({ where: { orderStatus: 'DELIVERED' } });
-    
-    const paidOrders = await db.order.findMany({
-      where: { paymentStatus: 'PAID' },
-      select: { totalAmount: true },
-    });
-    const totalRevenue = paidOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const { count: totalOrders } = await db.from('orders').select('*', { count: 'exact', head: true });
+    const { count: pendingOrders } = await db.from('orders').select('*', { count: 'exact', head: true }).eq('order_status', 'PENDING');
+    const { count: completedOrders } = await db.from('orders').select('*', { count: 'exact', head: true }).eq('order_status', 'DELIVERED');
 
-    const totalCustomers = await db.user.count({ where: { role: 'CUSTOMER' } });
-    const totalProducts = await db.product.count();
-    const lowStockProducts = await db.product.count({ where: { stockQuantity: { lte: 10 } } });
+    const { data: paidOrders } = await db.from('orders').select('total_amount').eq('payment_status', 'PAID');
+    const totalRevenue = (paidOrders || []).reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
 
-    const recentOrders = await db.order.findMany({
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: { select: { name: true, email: true } },
-      },
-    });
+    const { count: totalCustomers } = await db.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'CUSTOMER');
+    const { count: totalProducts } = await db.from('products').select('*', { count: 'exact', head: true });
+    const { count: lowStockProducts } = await db.from('products').select('*', { count: 'exact', head: true }).lte('stock_quantity', 10);
+
+    const { data: recentOrders } = await db.from('orders')
+      .select('*, user:profiles(name, email)')
+      .order('created_at', { ascending: false })
+      .limit(5);
 
     return NextResponse.json({
       stats: {
-        totalOrders,
-        pendingOrders,
-        completedOrders,
+        totalOrders: totalOrders || 0,
+        pendingOrders: pendingOrders || 0,
+        completedOrders: completedOrders || 0,
         totalRevenue,
-        totalCustomers,
-        totalProducts,
-        lowStockProducts,
+        totalCustomers: totalCustomers || 0,
+        totalProducts: totalProducts || 0,
+        lowStockProducts: lowStockProducts || 0,
       },
-      recentOrders,
+      recentOrders: recentOrders || [],
     });
   } catch (error) {
     console.error('Fetch admin stats error:', error);

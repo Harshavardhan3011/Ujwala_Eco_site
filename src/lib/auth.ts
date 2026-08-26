@@ -1,7 +1,7 @@
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
+import { db } from '@/lib/db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ujwala_eco_products_secret_2026';
 
@@ -10,15 +10,6 @@ export interface TokenPayload {
   email: string;
   role: string;
   name: string;
-}
-
-export async function hashPassword(password: string): Promise<string> {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(password, salt);
-}
-
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
 }
 
 export function signToken(payload: TokenPayload): string {
@@ -34,7 +25,7 @@ export function verifyToken(token: string): TokenPayload | null {
 }
 
 export async function getAuthSession(): Promise<TokenPayload | null> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get('auth_token')?.value;
 
   if (!token) return null;

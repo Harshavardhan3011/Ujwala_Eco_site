@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { hashPassword, signToken } from '@/lib/auth';
+import { signToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -16,40 +16,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 6 characters long' }, { status: 400 });
     }
 
-    const existingUser = await db.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
-    });
+    const cleanEmail = email.toLowerCase().trim();
 
-    if (existingUser) {
-      return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 });
-    }
-
-    const passwordHash = await hashPassword(password);
-    const user = await db.user.create({
-      data: {
-        name,
-        email: email.toLowerCase().trim(),
-        passwordHash,
-        phone: phone || null,
-        role: 'CUSTOMER',
+    // Register user via Supabase Auth
+    const { data: authData, error: authError } = await db.auth.signUp({
+      email: cleanEmail,
+      password,
+      options: {
+        data: {
+          name,
+          phone: phone || null,
+          role: 'CUSTOMER',
+        },
       },
     });
 
+    if (authError) {
+      return NextResponse.json({ error: authError.message }, { status: 400 });
+    }
+
+    const user = authData.user;
+    if (!user) {
+      return NextResponse.json({ error: 'Failed to create user account' }, { status: 500 });
+    }
+
+    // Ensure profile row exists in public.profiles
+    const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).single();
+
+    const userRole = profile?.role || 'CUSTOMER';
+    const userName = profile?.name || name;
+
     const token = signToken({
       userId: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.name,
+      email: cleanEmail,
+      role: userRole,
+      name: userName,
     });
 
     const response = NextResponse.json({
       message: 'Account created successfully',
       user: {
         id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
+        name: userName,
+        email: cleanEmail,
+        role: userRole,
+        phone: phone || null,
       },
       token,
     }, { status: 201 });
@@ -63,8 +74,8 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

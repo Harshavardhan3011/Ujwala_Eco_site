@@ -15,26 +15,25 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
 
-    let where: any = {};
+    let query = db.from('orders').select(`
+      *,
+      items:order_items(*),
+      payment:payments(*),
+      user:profiles(name, email, phone)
+    `).order('created_at', { ascending: false });
+
     if (session.role !== 'ADMIN') {
-      where.userId = session.userId;
+      query = query.eq('user_id', session.userId);
     }
 
     if (status) {
-      where.orderStatus = status;
+      query = query.eq('order_status', status);
     }
 
-    const orders = await db.order.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        items: true,
-        payment: true,
-        user: { select: { name: true, email: true, phone: true } },
-      },
-    });
+    const { data: orders, error } = await query;
+    if (error) throw error;
 
-    return NextResponse.json({ orders });
+    return NextResponse.json({ orders: orders || [] });
   } catch (error) {
     console.error('Fetch orders error:', error);
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
@@ -65,93 +64,95 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch user's cart items
-    const cartItems = await db.cartItem.findMany({
-      where: { userId: session.userId },
-      include: { product: true },
-    });
+    const { data: cartItems, error: cartErr } = await db.from('cart_items')
+      .select('*, product:products(*)')
+      .eq('user_id', session.userId);
 
-    if (cartItems.length === 0) {
+    if (cartErr || !cartItems || cartItems.length === 0) {
       return NextResponse.json({ error: 'Your shopping cart is empty' }, { status: 400 });
     }
 
-    // Recalculate totals from database prices (NEVER trust frontend prices!)
     let subtotal = 0;
-    const orderItemsData = [];
+    const orderItemsData: any[] = [];
 
     for (const item of cartItems) {
-      const price = item.product.discountPrice ?? item.product.price;
-      
-      // Stock check
-      if (item.product.stockQuantity < item.quantity) {
+      const prod = item.product;
+      const price = parseFloat(prod.discount_price ?? prod.price);
+
+      if (prod.stock_quantity < item.quantity) {
         return NextResponse.json({
-          error: `Insufficient stock for product: ${item.product.name}. Available: ${item.product.stockQuantity}`,
+          error: `Insufficient stock for product: ${prod.name}. Available: ${prod.stock_quantity}`,
         }, { status: 400 });
       }
 
       subtotal += price * item.quantity;
       orderItemsData.push({
-        productId: item.product.id,
-        productName: item.product.name,
-        productSku: item.product.sku,
+        product_id: prod.id,
+        product_name: prod.name,
+        product_sku: prod.sku,
         price,
         quantity: item.quantity,
-        customizationNotes: item.customizationNotes,
+        customization_notes: item.customization_notes,
       });
     }
 
     const shippingFee = subtotal > 1000 ? 0 : 50;
     const totalAmount = subtotal + shippingFee;
-
     const orderNumber = `UJW-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
-    const order = await db.order.create({
-      data: {
-        orderNumber,
-        userId: session.userId,
-        shippingName,
-        shippingPhone,
-        shippingAddress,
-        shippingCity,
-        shippingState: shippingState || 'Andhra Pradesh',
-        shippingPostalCode,
-        subtotal,
-        shippingFee,
-        totalAmount,
-        orderStatus: 'PENDING',
-        paymentStatus: 'PENDING',
-        paymentMethod,
-        customizationNotes,
-        customFileUrl,
-        items: {
-          create: orderItemsData,
-        },
-      },
-      include: {
-        items: true,
-      },
-    });
+    const { data: order, error: orderErr } = await db.from('orders').insert({
+      order_number: orderNumber,
+      user_id: session.userId,
+      shipping_name: shippingName,
+      shipping_phone: shippingPhone,
+      shipping_address: shippingAddress,
+      shipping_city: shippingCity,
+      shipping_state: shippingState || 'Andhra Pradesh',
+      shipping_postal_code: shippingPostalCode,
+      subtotal,
+      shipping_fee: shippingFee,
+      total_amount: totalAmount,
+      order_status: 'PENDING',
+      payment_status: 'PENDING',
+      payment_method: paymentMethod,
+      customization_notes: customizationNotes,
+      custom_file_url: customFileUrl,
+    }).select().single();
+
+    if (orderErr) throw orderErr;
+
+    // Insert order items
+    const itemsToInsert = orderItemsData.map((item) => ({
+      ...item,
+      order_id: order.id,
+    }));
+    await db.from('order_items').insert(itemsToInsert);
 
     // Create Razorpay payment order
     let razorpayOrder = null;
     if (paymentMethod === 'RAZORPAY') {
       razorpayOrder = await createPaymentOrder({
         amount: totalAmount,
-        receipt: order.orderNumber,
+        receipt: order.order_number,
         notes: { orderId: order.id, customerName: shippingName },
       });
 
-      await db.payment.create({
-        data: {
-          orderId: order.id,
-          razorpayOrderId: razorpayOrder.id,
-          amount: totalAmount,
-          status: 'PENDING',
-        },
+      await db.from('payments').insert({
+        order_id: order.id,
+        razorpay_order_id: razorpayOrder.id,
+        amount: totalAmount,
+        status: 'PENDING',
       });
     }
 
+    // Clear user cart after order placement
+    await db.from('cart_items').delete().eq('user_id', session.userId);
+
     return NextResponse.json({
-      order,
+      order: {
+        ...order,
+        items: itemsToInsert,
+      },
       razorpayOrder,
     }, { status: 201 });
   } catch (error: any) {

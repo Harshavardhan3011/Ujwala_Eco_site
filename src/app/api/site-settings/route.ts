@@ -6,9 +6,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const settingsList = await db.siteSetting.findMany();
+    const { data: settingsList, error } = await db.from('site_settings').select('*');
+    if (error) throw error;
+
     const settings: Record<string, string> = {};
-    settingsList.forEach((s) => {
+    (settingsList || []).forEach((s: any) => {
       settings[s.key] = s.value;
     });
 
@@ -26,18 +28,18 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Admin authorization required' }, { status: 403 });
     }
 
-    const { settings } = await req.json(); // key-value object
+    const { settings } = await req.json();
 
     if (!settings || typeof settings !== 'object') {
       return NextResponse.json({ error: 'Settings object is required' }, { status: 400 });
     }
 
     for (const [key, value] of Object.entries(settings)) {
-      await db.siteSetting.upsert({
-        where: { key },
-        update: { value: String(value) },
-        create: { key, value: String(value) },
-      });
+      await db.from('site_settings').upsert({
+        key,
+        value: String(value),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
     }
 
     return NextResponse.json({ message: 'Site settings updated successfully' });

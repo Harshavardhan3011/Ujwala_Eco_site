@@ -14,17 +14,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const { id } = params;
     const { name, slug, description, image, displayOrder, isActive } = await req.json();
 
-    const category = await db.category.update({
-      where: { id },
-      data: {
-        name,
-        slug,
-        description,
-        image,
-        displayOrder: displayOrder !== undefined ? parseInt(displayOrder) : undefined,
-        isActive,
-      },
-    });
+    const updatePayload: any = {};
+    if (name !== undefined) updatePayload.name = name;
+    if (slug !== undefined) updatePayload.slug = slug;
+    if (description !== undefined) updatePayload.description = description;
+    if (image !== undefined) updatePayload.image = image;
+    if (displayOrder !== undefined) updatePayload.display_order = parseInt(displayOrder);
+    if (isActive !== undefined) updatePayload.is_active = Boolean(isActive);
+    updatePayload.updated_at = new Date().toISOString();
+
+    const { data: category, error } = await db
+      .from('categories')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({ category });
   } catch (error: any) {
@@ -41,7 +47,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
 
     const { id } = params;
-    await db.category.delete({ where: { id } });
+    const { error } = await db.from('categories').delete().eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ message: 'Category deleted successfully' });
   } catch (error) {

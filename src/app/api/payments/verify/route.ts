@@ -19,58 +19,44 @@ export async function POST(req: NextRequest) {
     });
 
     if (!isSignatureValid) {
-      await db.payment.update({
-        where: { orderId },
-        data: { status: 'FAILED' },
-      });
-      await db.order.update({
-        where: { id: orderId },
-        data: { paymentStatus: 'FAILED' },
-      });
+      await db.from('payments').update({ status: 'FAILED' }).eq('order_id', orderId);
+      await db.from('orders').update({ payment_status: 'FAILED' }).eq('id', orderId);
       return NextResponse.json({ error: 'Payment signature verification failed' }, { status: 400 });
     }
 
     // Update payment record
-    await db.payment.update({
-      where: { orderId },
-      data: {
-        razorpayPaymentId: razorpay_payment_id,
-        razorpaySignature: razorpay_signature || 'simulated',
-        status: 'SUCCESS',
-      },
-    });
+    await db.from('payments').update({
+      razorpay_payment_id: razorpay_payment_id,
+      razorpay_signature: razorpay_signature || 'simulated',
+      status: 'SUCCESS',
+      updated_at: new Date().toISOString(),
+    }).eq('order_id', orderId);
 
     // Update order status
-    const order = await db.order.update({
-      where: { id: orderId },
-      data: {
-        paymentStatus: 'PAID',
-        orderStatus: 'CONFIRMED',
-      },
-      include: { items: true },
-    });
+    const { data: order, error: orderErr } = await db.from('orders').update({
+      payment_status: 'PAID',
+      order_status: 'CONFIRMED',
+      updated_at: new Date().toISOString(),
+    }).eq('id', orderId).select('*, items:order_items(*)').single();
 
-    // Deduct stock for ordered items safely
-    for (const item of order.items) {
-      await db.product.update({
-        where: { id: item.productId },
-        data: {
-          stockQuantity: {
-            decrement: item.quantity,
-          },
-        },
-      });
+    if (orderErr) throw orderErr;
+
+    // Deduct stock for ordered items
+    for (const item of (order.items || [])) {
+      const { data: prod } = await db.from('products').select('stock_quantity').eq('id', item.product_id).single();
+      if (prod) {
+        const newStock = Math.max(0, prod.stock_quantity - item.quantity);
+        await db.from('products').update({ stock_quantity: newStock }).eq('id', item.product_id);
+      }
     }
 
-    // Clear cart for the user
-    await db.cartItem.deleteMany({
-      where: { userId: order.userId },
-    });
+    // Clear cart for user
+    await db.from('cart_items').delete().eq('user_id', order.user_id);
 
     return NextResponse.json({
       message: 'Payment verified successfully and order confirmed',
       orderId: order.id,
-      orderNumber: order.orderNumber,
+      orderNumber: order.order_number,
     });
   } catch (error: any) {
     console.error('Payment verification error:', error);

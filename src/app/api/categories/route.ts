@@ -6,17 +6,31 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const categories = await db.category.findMany({
-      where: { isActive: true },
-      orderBy: { displayOrder: 'asc' },
-      include: {
+    const { data: categories, error } = await db
+      .from('categories')
+      .select('*, products:products(id)')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+
+    const formattedCategories = (categories || []).map((cat: any) => {
+      const productCount = (cat.products || []).length;
+      return {
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        description: cat.description,
+        image: cat.image,
+        displayOrder: cat.display_order,
+        isActive: cat.is_active,
         _count: {
-          select: { products: true },
+          products: productCount,
         },
-      },
+      };
     });
 
-    return NextResponse.json({ categories });
+    return NextResponse.json({ categories: formattedCategories });
   } catch (error) {
     console.error('Fetch categories error:', error);
     return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 });
@@ -38,15 +52,15 @@ export async function POST(req: NextRequest) {
 
     const generatedSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    const category = await db.category.create({
-      data: {
-        name,
-        slug: generatedSlug,
-        description,
-        image,
-        displayOrder: displayOrder ? parseInt(displayOrder) : 0,
-      },
-    });
+    const { data: category, error } = await db.from('categories').insert({
+      name,
+      slug: generatedSlug,
+      description,
+      image,
+      display_order: displayOrder ? parseInt(displayOrder) : 0,
+    }).select().single();
+
+    if (error) throw error;
 
     return NextResponse.json({ category }, { status: 201 });
   } catch (error: any) {

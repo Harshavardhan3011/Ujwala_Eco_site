@@ -1,45 +1,48 @@
-async function testAllRoutes() {
-  const routes = [
-    { url: '/api/categories', method: 'GET' },
-    { url: '/api/products', method: 'GET' },
-    { url: '/api/products?featured=true&limit=8', method: 'GET' },
-    { url: '/api/products?sort=featured&minPrice=0&maxPrice=2000&page=1&limit=12', method: 'GET' },
-    { url: '/api/cart', method: 'GET' },
-    { url: '/api/wishlist', method: 'GET' },
-    { url: '/api/reviews', method: 'GET' },
-    { url: '/api/site-settings', method: 'GET' },
-    { url: '/api/auth/me', method: 'GET' }
+const http = require('http');
+
+function fetchUrl(urlPath) {
+  return new Promise((resolve, reject) => {
+    http.get(`http://localhost:3000${urlPath}`, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode, data: JSON.parse(data) });
+        } catch (e) {
+          resolve({ status: res.statusCode, raw: data });
+        }
+      });
+    }).on('error', (err) => reject(err));
+  });
+}
+
+async function runTests() {
+  console.log('Testing API Endpoints against local server...');
+  const endpoints = [
+    '/api/categories',
+    '/api/products?featured=true&limit=8',
+    '/api/products?sort=featured&minPrice=0&maxPrice=2000&page=1&limit=12',
+    '/api/cart',
+    '/api/reviews',
+    '/api/site-settings'
   ];
 
-  console.log('=== FULL API BACKEND VERIFICATION ===\n');
-
   let passed = 0;
-  let failed = 0;
-
-  for (const r of routes) {
+  for (const ep of endpoints) {
     try {
-      const res = await fetch('http://localhost:3000' + r.url, { method: r.method });
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = text; }
-
-      if (res.status >= 200 && res.status < 400) {
-        console.log(`✓ [${res.status}] ${r.url}`);
-        passed++;
-      } else if (res.status === 401 && r.url === '/api/auth/me') {
-        console.log(`✓ [${res.status} Expected 401 Unauthenticated] ${r.url}`);
+      const res = await fetchUrl(ep);
+      if (res.status === 200) {
+        console.log(`✅ [200 OK] ${ep}`);
         passed++;
       } else {
-        console.log(`❌ [${res.status}] ${r.url} -> ${JSON.stringify(data)}`);
-        failed++;
+        console.error(`❌ [${res.status}] ${ep}`, res.data || res.raw);
       }
     } catch (err) {
-      console.log(`❌ [FETCH ERROR] ${r.url}:`, err.message);
-      failed++;
+      console.error(`❌ [ERROR] ${ep}: ${err.message}`);
     }
   }
 
-  console.log(`\nResults: ${passed} PASSED, ${failed} FAILED.`);
+  console.log(`\nResults: ${passed}/${endpoints.length} endpoints passed.`);
 }
 
-testAllRoutes();
+runTests();

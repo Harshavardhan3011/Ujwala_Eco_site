@@ -12,23 +12,30 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const { id } = params;
-    const order = await db.order.findFirst({
-      where: {
-        OR: [{ id }, { orderNumber: id }],
-      },
-      include: {
-        items: true,
-        payment: true,
-        user: { select: { name: true, email: true, phone: true } },
-      },
-    });
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-    if (!order) {
+    let query = db.from('orders').select(`
+      *,
+      items:order_items(*),
+      payment:payments(*),
+      user:profiles(name, email, phone)
+    `);
+
+    if (isUuid) {
+      query = query.or(`id.eq.${id},order_number.eq.${id}`);
+    } else {
+      query = query.eq('order_number', id);
+    }
+
+    const { data: orders, error } = await query;
+    if (error || !orders || orders.length === 0) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    // Authorization check: user must own order or be admin
-    if (session.role !== 'ADMIN' && order.userId !== session.userId) {
+    const order = orders[0];
+
+    // Authorization check
+    if (session.role !== 'ADMIN' && order.user_id !== session.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -49,14 +56,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const { id } = params;
     const { orderStatus, paymentStatus } = await req.json();
 
-    const order = await db.order.update({
-      where: { id },
-      data: {
-        orderStatus: orderStatus ?? undefined,
-        paymentStatus: paymentStatus ?? undefined,
-      },
-      include: { items: true, payment: true },
-    });
+    const updatePayload: any = {};
+    if (orderStatus) updatePayload.order_status = orderStatus;
+    if (paymentStatus) updatePayload.payment_status = paymentStatus;
+    updatePayload.updated_at = new Date().toISOString();
+
+    const { data: order, error } = await db.from('orders')
+      .update(updatePayload)
+      .eq('id', id)
+      .select('*, items:order_items(*), payment:payments(*)')
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({ order });
   } catch (error) {

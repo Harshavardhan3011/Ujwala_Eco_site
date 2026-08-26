@@ -11,19 +11,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ wishlist: [] });
     }
 
-    const items = await db.wishlistItem.findMany({
-      where: { userId: session.userId },
-      include: {
-        product: {
-          include: {
-            category: true,
-            images: { orderBy: { displayOrder: 'asc' }, take: 1 },
-          },
-        },
-      },
-    });
+    const { data: items, error } = await db
+      .from('wishlist_items')
+      .select('*, product:products(*, category:categories(*), images:product_images(*))')
+      .eq('user_id', session.userId);
 
-    return NextResponse.json({ wishlist: items });
+    if (error) throw error;
+
+    return NextResponse.json({ wishlist: items || [] });
   } catch (error) {
     console.error('Fetch wishlist error:', error);
     return NextResponse.json({ error: 'Failed to fetch wishlist' }, { status: 500 });
@@ -42,24 +37,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product ID required' }, { status: 400 });
     }
 
-    const existing = await db.wishlistItem.findUnique({
-      where: {
-        userId_productId: {
-          userId: session.userId,
-          productId,
-        },
-      },
-    });
+    const { data: existing } = await db
+      .from('wishlist_items')
+      .select('*')
+      .eq('user_id', session.userId)
+      .eq('product_id', productId)
+      .single();
 
     if (existing) {
-      await db.wishlistItem.delete({ where: { id: existing.id } });
+      await db.from('wishlist_items').delete().eq('id', existing.id);
       return NextResponse.json({ message: 'Removed from wishlist', inWishlist: false });
     } else {
-      await db.wishlistItem.create({
-        data: {
-          userId: session.userId,
-          productId,
-        },
+      await db.from('wishlist_items').insert({
+        user_id: session.userId,
+        product_id: productId,
       });
       return NextResponse.json({ message: 'Added to wishlist', inWishlist: true }, { status: 201 });
     }

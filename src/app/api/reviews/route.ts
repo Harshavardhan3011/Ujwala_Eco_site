@@ -9,16 +9,15 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get('productId');
 
-    const where: any = { isApproved: true };
-    if (productId) where.productId = productId;
+    let query = db.from('reviews').select('*').eq('is_approved', true).order('created_at', { ascending: false }).limit(50);
+    if (productId) {
+      query = query.eq('product_id', productId);
+    }
 
-    const reviews = await db.review.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
+    const { data: reviews, error } = await query;
+    if (error) throw error;
 
-    return NextResponse.json({ reviews });
+    return NextResponse.json({ reviews: reviews || [] });
   } catch (error) {
     console.error('Fetch reviews error:', error);
     return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 });
@@ -37,16 +36,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product ID, rating, and comment are required' }, { status: 400 });
     }
 
-    const review = await db.review.create({
-      data: {
-        productId,
-        userId: session.userId,
-        userName: session.name,
-        rating: parseInt(rating),
-        comment,
-        isApproved: true,
-      },
-    });
+    const { data: review, error } = await db.from('reviews').insert({
+      product_id: productId,
+      user_id: session.userId,
+      user_name: session.name,
+      rating: parseInt(rating),
+      comment,
+      is_approved: true,
+    }).select().single();
+
+    if (error) throw error;
 
     return NextResponse.json({ review }, { status: 201 });
   } catch (error) {
