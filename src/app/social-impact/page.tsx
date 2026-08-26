@@ -3,22 +3,28 @@
 import React from 'react';
 import Link from 'next/link';
 import { Heart, BookOpen, Award, Users, ArrowRight } from 'lucide-react';
+import { getStorageUrl } from '@/lib/storage';
 
 export default function SocialImpactPage() {
-  const trustImages = [
-    '/Ujwala _Educational_&_Social_Trust/e1.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e2.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e3.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e4.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e5.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e6.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e7.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e8.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e9.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e10.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e11.jpeg',
-    '/Ujwala _Educational_&_Social_Trust/e12.jpeg',
+  const rawTrustImages = [
+    'trusts/e1.jpeg',
+    'trusts/e2.jpeg',
+    'trusts/e3.jpeg',
+    'trusts/e4.jpeg',
+    'trusts/e5.jpeg',
+    'trusts/e6.jpeg',
+    'trusts/e7.jpeg',
+    'trusts/e8.jpeg',
+    'trusts/e9.jpeg',
+    'trusts/e10.jpeg',
+    'trusts/e11.jpeg',
+    'trusts/e12.jpeg',
   ];
+
+  const trustImages = rawTrustImages.map((raw) => ({
+    src: getStorageUrl(raw),
+    localFallback: `/Ujwala _Educational_&_Social_Trust/${raw.replace('trusts/', '')}`,
+  }));
 
   return (
     <div className="container mx-auto px-4 py-10 space-y-16 max-w-5xl">
@@ -75,14 +81,22 @@ export default function SocialImpactPage() {
             Social Initiatives Photo Records
           </h2>
           <p className="text-xs text-slate-500">
-            Real event photographs documenting our book distribution drives and community welfare events.
+            Real event photographs from Supabase Storage documenting our book distribution drives and community welfare events.
           </p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {trustImages.map((img, idx) => (
             <div key={idx} className="aspect-square bg-canvas-100 rounded-2xl overflow-hidden border border-eco-100 shadow-xs hover:shadow-md transition-shadow">
-              <img src={img} alt={`Trust event ${idx + 1}`} className="w-full h-full object-cover" />
+              <img
+                src={img.src}
+                alt={`Trust event ${idx + 1}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = img.localFallback;
+                  (e.target as HTMLImageElement).onerror = null;
+                }}
+              />
             </div>
           ))}
         </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ProductCard } from '@/components/product/ProductCard';
 import { QuickViewModal } from '@/components/ui/QuickViewModal';
+import { getStorageUrl } from '@/lib/storage';
 import {
   ShoppingBag,
   Sparkles,
@@ -110,26 +111,42 @@ export default function HomePage() {
             <div className="relative mx-auto max-w-md lg:max-w-none grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 <img
-                  src="/bags/b1.jpeg"
+                  src={getStorageUrl('products/b1.jpeg')}
                   alt="Everyday Jute Bag"
                   className="rounded-2xl shadow-2xl object-cover w-full h-64 border-2 border-eco-600/50"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/bags/b1.jpeg';
+                    (e.target as HTMLImageElement).onerror = null;
+                  }}
                 />
                 <img
-                  src="/bags/b5.jpeg"
+                  src={getStorageUrl('products/b5.jpeg')}
                   alt="Return Gift Bag"
                   className="rounded-2xl shadow-xl object-cover w-full h-44 border-2 border-eco-600/50"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/bags/b5.jpeg';
+                    (e.target as HTMLImageElement).onerror = null;
+                  }}
                 />
               </div>
               <div className="space-y-4 pt-8">
                 <img
-                  src="/bags/b3.jpeg"
+                  src={getStorageUrl('products/b3.jpeg')}
                   alt="Custom Printed Bag"
                   className="rounded-2xl shadow-xl object-cover w-full h-44 border-2 border-eco-600/50"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/bags/b3.jpeg';
+                    (e.target as HTMLImageElement).onerror = null;
+                  }}
                 />
                 <img
-                  src="/bags/b22.jpeg"
+                  src={getStorageUrl('products/b22.jpeg')}
                   alt="Etikoppaka Toys"
                   className="rounded-2xl shadow-2xl object-cover w-full h-64 border-2 border-eco-600/50"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/bags/b22.jpeg';
+                    (e.target as HTMLImageElement).onerror = null;
+                  }}
                 />
               </div>
             </div>
@@ -165,9 +182,13 @@ export default function HomePage() {
             >
               <div className="aspect-[4/3] bg-canvas-100 overflow-hidden relative">
                 <img
-                  src={cat.image || '/bags/b1.jpeg'}
+                  src={getStorageUrl(cat.image || 'products/b1.jpeg')}
                   alt={cat.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = cat.image || '/bags/b1.jpeg';
+                    (e.target as HTMLImageElement).onerror = null;
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
                 <span className="absolute bottom-2.5 left-3 text-[11px] font-bold text-jute-200 bg-eco-900/80 px-2 py-0.5 rounded-full backdrop-blur-xs">
@@ -270,9 +291,13 @@ export default function HomePage() {
 
             <div className="relative mx-auto">
               <img
-                src="/uploads/ujwala-banner.jpeg"
+                src={getStorageUrl('products/m1.jpeg')}
                 alt="Ujwala Eco Banner"
                 className="rounded-2xl shadow-2xl border-4 border-white/20 max-w-md w-full"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/bags/m1.jpeg';
+                  (e.target as HTMLImageElement).onerror = null;
+                }}
               />
             </div>
           </div>
@@ -284,9 +309,13 @@ export default function HomePage() {
         <div className="bg-white rounded-3xl border border-eco-100 p-8 md:p-12 shadow-sm grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="relative">
             <img
-              src="/uploads/founder-suguna.jpeg"
+              src={getStorageUrl('products/m1.jpeg')}
               alt="Founder N. Suguna"
               className="rounded-2xl shadow-xl w-full max-w-md mx-auto object-cover border-4 border-canvas-100"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/bags/m1.jpeg';
+                (e.target as HTMLImageElement).onerror = null;
+              }}
             />
             <div className="absolute -bottom-4 right-4 bg-eco-800 text-white p-4 rounded-2xl shadow-lg max-w-xs text-xs">
               <p className="font-serif italic text-jute-200">
@@ -305,7 +334,8 @@ export default function HomePage() {
             </h2>
             <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
               Started in the residential compound of founder <strong>N. Suguna</strong> in Simhadrinagar, Duvvada, Ujwala Eco Products was established with a dual mission: to combat single-use plastic pollution and to create meaningful employment opportunities for homemakers and women artisans in the surrounding community.
-            </p>            <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
+            </p>
+            <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
               Every bag is hand-woven from raw golden jute fiber and carefully stitched to endure years of daily use. By choosing Ujwala, you directly support local women households and sustainable livelihoods.
             </p>
 
@@ -321,7 +351,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6. Social Impact Trust Section (Ujwala Educational & Social Trust) */}
+      {/* 6. Social Impact Trust Section */}
       <section className="container mx-auto px-4">
         <div className="bg-canvas-100 rounded-3xl border border-eco-200 p-8 md:p-12">
           <div className="text-center max-w-2xl mx-auto space-y-3 mb-10">
@@ -401,12 +431,23 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {['/bags/m1.jpeg', '/bags/m2.jpeg', '/bags/m3.jpeg', '/opening/o1.jpeg', '/opening/o2.jpeg', '/Ujwala _Educational_&_Social_Trust/e1.jpeg'].map((img, idx) => (
+          {[
+            { path: 'products/m1.jpeg', fallback: '/bags/m1.jpeg' },
+            { path: 'products/m2.jpeg', fallback: '/bags/m2.jpeg' },
+            { path: 'products/m3.jpeg', fallback: '/bags/m3.jpeg' },
+            { path: 'openings/o1.jpeg', fallback: '/opening/o1.jpeg' },
+            { path: 'openings/o2.jpeg', fallback: '/opening/o2.jpeg' },
+            { path: 'trusts/e1.jpeg', fallback: '/Ujwala _Educational_&_Social_Trust/e1.jpeg' },
+          ].map((item, idx) => (
             <div key={idx} className="aspect-square bg-canvas-100 rounded-xl overflow-hidden border border-eco-100 group relative">
               <img
-                src={img}
+                src={getStorageUrl(item.path)}
                 alt="Gallery photo"
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = item.fallback;
+                  (e.target as HTMLImageElement).onerror = null;
+                }}
               />
               <div className="absolute inset-0 bg-eco-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
                 View Photo

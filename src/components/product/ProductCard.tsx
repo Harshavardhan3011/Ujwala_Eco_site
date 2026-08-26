@@ -6,6 +6,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { Heart, ShoppingBag, Star, Eye, Check } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
+import { getStorageUrl } from '@/lib/storage';
 
 export interface ProductCardProps {
   product: {
@@ -33,8 +34,8 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
   const [isAdding, setIsAdding] = useState(false);
   const [addedSuccess, setAddedSuccess] = useState(false);
 
-  const primaryImage = product.images[0]?.imageUrl || '/bags/b1.jpeg';
-  const secondaryImage = product.images[1]?.imageUrl || primaryImage;
+  const rawPrimaryImage = product.images[0]?.imageUrl || '/bags/b1.jpeg';
+  const primaryImage = getStorageUrl(rawPrimaryImage);
 
   const inWishlist = isInWishlist(product.id);
 
@@ -69,8 +70,12 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
             onError={(e) => {
-              console.warn('[Image 404] Failed to load product image:', primaryImage, 'for product:', product.name);
-              (e.target as HTMLImageElement).src = '/placeholder-product.svg';
+              // Fallback to local /bags/ path if Supabase storage object isn't uploaded yet
+              if (rawPrimaryImage.startsWith('/bags/')) {
+                (e.target as HTMLImageElement).src = rawPrimaryImage;
+              } else {
+                (e.target as HTMLImageElement).src = '/placeholder-product.svg';
+              }
               (e.target as HTMLImageElement).onerror = null;
             }}
           />

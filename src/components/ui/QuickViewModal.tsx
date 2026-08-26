@@ -6,6 +6,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { X, Star, ShoppingBag, Heart, Check, Shield, Truck } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
+import { getStorageUrl } from '@/lib/storage';
 
 export interface QuickViewModalProps {
   product: any;
@@ -16,9 +17,8 @@ export const QuickViewModal = ({ product, onClose }: QuickViewModalProps) => {
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
 
-  const [selectedImage, setSelectedImage] = useState(
-    product.images[0]?.imageUrl || '/bags/b1.jpeg'
-  );
+  const initialRawImage = product.images[0]?.imageUrl || '/bags/b1.jpeg';
+  const [selectedImage, setSelectedImage] = useState(initialRawImage);
   const [quantity, setQuantity] = useState(product.minOrderQuantity || 1);
   const [customizationNotes, setCustomizationNotes] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -35,6 +35,8 @@ export const QuickViewModal = ({ product, onClose }: QuickViewModalProps) => {
       setTimeout(() => setAddedSuccess(false), 2000);
     }
   };
+
+  const displayImage = getStorageUrl(selectedImage);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
@@ -58,24 +60,39 @@ export const QuickViewModal = ({ product, onClose }: QuickViewModalProps) => {
           <div className="space-y-3">
             <div className="aspect-square bg-canvas-100 rounded-2xl overflow-hidden border border-eco-100">
               <img
-                src={selectedImage}
+                src={displayImage}
                 alt={product.name}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = selectedImage.startsWith('/bags/') ? selectedImage : '/placeholder-product.svg';
+                  (e.target as HTMLImageElement).onerror = null;
+                }}
               />
             </div>
             {product.images?.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
-                {product.images.map((img: any, idx: number) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedImage(img.imageUrl)}
-                    className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${
-                      selectedImage === img.imageUrl ? 'border-eco-600' : 'border-transparent opacity-70'
-                    }`}
-                  >
-                    <img src={img.imageUrl} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
+                {product.images.map((img: any, idx: number) => {
+                  const thumbUrl = getStorageUrl(img.imageUrl);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedImage(img.imageUrl)}
+                      className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                        selectedImage === img.imageUrl ? 'border-eco-600' : 'border-transparent opacity-70'
+                      }`}
+                    >
+                      <img
+                        src={thumbUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = img.imageUrl.startsWith('/bags/') ? img.imageUrl : '/placeholder-product.svg';
+                          (e.target as HTMLImageElement).onerror = null;
+                        }}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

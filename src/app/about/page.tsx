@@ -3,8 +3,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { Heart, ShieldCheck, Users, MapPin, CheckCircle2, ArrowRight } from 'lucide-react';
+import { getStorageUrl } from '@/lib/storage';
 
 export default function AboutPage() {
+  const unitImages = [
+    { src: getStorageUrl('products/m1.jpeg'), fallback: '/bags/m1.jpeg' },
+    { src: getStorageUrl('products/m2.jpeg'), fallback: '/bags/m2.jpeg' },
+    { src: getStorageUrl('products/m3.jpeg'), fallback: '/bags/m3.jpeg' },
+    { src: getStorageUrl('products/m4.jpeg'), fallback: '/bags/m4.jpeg' },
+  ];
+
   return (
     <div className="container mx-auto px-4 py-10 space-y-16 max-w-5xl">
       {/* Header Banner */}
@@ -37,9 +45,13 @@ export default function AboutPage() {
 
         <div className="relative">
           <img
-            src="/uploads/founder-suguna.jpeg"
+            src={getStorageUrl('products/m1.jpeg')}
             alt="N. Suguna Founder"
             className="rounded-2xl shadow-xl w-full object-cover border-4 border-canvas-100"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/bags/m1.jpeg';
+              (e.target as HTMLImageElement).onerror = null;
+            }}
           />
         </div>
       </div>
@@ -83,10 +95,18 @@ export default function AboutPage() {
           Our Manufacturing Unit & Quality Standards
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <img src="/bags/m1.jpeg" alt="Unit photo 1" className="rounded-xl aspect-square object-cover" />
-          <img src="/bags/m2.jpeg" alt="Unit photo 2" className="rounded-xl aspect-square object-cover" />
-          <img src="/bags/m3.jpeg" alt="Unit photo 3" className="rounded-xl aspect-square object-cover" />
-          <img src="/bags/m4.jpeg" alt="Unit photo 4" className="rounded-xl aspect-square object-cover" />
+          {unitImages.map((img, idx) => (
+            <img
+              key={idx}
+              src={img.src}
+              alt={`Unit photo ${idx + 1}`}
+              className="rounded-xl aspect-square object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = img.fallback;
+                (e.target as HTMLImageElement).onerror = null;
+              }}
+            />
+          ))}
         </div>
       </div>
     </div>
