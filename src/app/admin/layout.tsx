@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   FileText,
   Settings,
+  UserCheck,
   ArrowLeft,
   ShieldCheck,
 } from 'lucide-react';
@@ -21,22 +22,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
 
   const isLoginPage = pathname === '/admin/login';
+  const roleLower = user?.role?.toLowerCase();
+  const isAuthorized = roleLower === 'admin' || roleLower === 'superadmin';
+  const isSuperAdmin = roleLower === 'superadmin';
 
   useEffect(() => {
-    if (!isLoginPage && !isLoading && (!user || user.role?.toLowerCase() !== 'admin')) {
-      router.push('/admin/login');
+    if (!isLoginPage && !isLoading) {
+      if (!user || !isAuthorized) {
+        router.push('/admin/login');
+      } else if (pathname.startsWith('/admin/users') && !isSuperAdmin) {
+        router.push('/admin');
+      }
     }
-  }, [user, isLoading, router, pathname, isLoginPage]);
+  }, [user, isLoading, router, pathname, isLoginPage, isAuthorized, isSuperAdmin]);
 
   if (isLoginPage) {
     return <>{children}</>;
   }
 
-  if (isLoading || !user || user.role?.toLowerCase() !== 'admin') {
+  if (isLoading || !user || !isAuthorized) {
     return (
       <div className="container mx-auto px-4 py-16 text-center text-xs font-bold text-slate-500 space-y-2">
         <ShieldCheck className="w-8 h-8 text-eco-700 mx-auto animate-bounce" />
-        <p>Verifying Admin Security Clearance...</p>
+        <p>Verifying Security Credentials...</p>
       </div>
     );
   }
@@ -50,16 +58,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Site Settings', href: '/admin/site-settings', icon: Settings },
   ];
 
+  if (isSuperAdmin) {
+    adminNav.push({ name: 'User Management', href: '/admin/users', icon: UserCheck });
+  }
+
   return (
     <div className="bg-canvas-100 min-h-screen">
       <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border border-eco-100 mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border border-eco-100 mb-6 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-eco-800 text-jute-300 font-bold flex items-center justify-center">
               ⚙️
             </div>
             <div>
-              <h1 className="font-serif font-bold text-base text-slate-900">Admin Control Center</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-serif font-bold text-base text-slate-900">Admin Control Center</h1>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  isSuperAdmin ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-eco-100 text-eco-800'
+                }`}>
+                  {isSuperAdmin ? 'SUPERADMIN' : 'ADMIN'}
+                </span>
+              </div>
               <p className="text-[11px] text-slate-500">Ujwala Eco Products Management</p>
             </div>
           </div>

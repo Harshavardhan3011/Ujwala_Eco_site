@@ -37,9 +37,26 @@ export function getAuthFromRequest(req: NextRequest): TokenPayload | null {
   return verifyToken(token);
 }
 
+export function isSuperAdmin(role?: string): boolean {
+  return role?.toLowerCase() === 'superadmin';
+}
+
+export function isAdminOrSuperAdmin(role?: string): boolean {
+  const r = role?.toLowerCase();
+  return r === 'admin' || r === 'superadmin';
+}
+
 export function verifyAdminFromRequest(req: NextRequest): TokenPayload | null {
   const session = getAuthFromRequest(req);
-  if (!session || !session.role || session.role.toLowerCase() !== 'admin') {
+  if (!session || !isAdminOrSuperAdmin(session.role)) {
+    return null;
+  }
+  return session;
+}
+
+export function verifySuperAdminFromRequest(req: NextRequest): TokenPayload | null {
+  const session = getAuthFromRequest(req);
+  if (!session || !isSuperAdmin(session.role)) {
     return null;
   }
   return session;

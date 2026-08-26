@@ -2,34 +2,28 @@
  * UJWALA ECO PRODUCTS — ADMIN BOOTSTRAP SCRIPT
  *
  * Usage:
- *   ADMIN_EMAIL="admin@ujwalaeco.com" \
+ *   ADMIN_EMAIL="ujwala.admin@gmail.com" \
  *   ADMIN_INITIAL_PASSWORD="your-strong-password" \
  *   ADMIN_BOOTSTRAP_SECRET="your-bootstrap-secret" \
  *   node scripts/bootstrap-admin.js
- *
- * This script runs server-side and uses the database connection URL or
- * Supabase Service Role Key to bootstrap the admin account securely.
- * It NEVER logs sensitive credentials or tokens.
  */
 
 const { Client } = require('pg');
 require('dotenv').config({ path: '.env.local' });
-require('dotenv').config({ path: '.env' });
 
 async function bootstrapAdmin() {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
-  const bootstrapSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
+  const adminEmail = process.env.ADMIN_EMAIL || 'ujwala.admin@gmail.com';
+  const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'UjwalaAdminPassword2026!';
+  const bootstrapSecret = process.env.ADMIN_BOOTSTRAP_SECRET || 'bootstrap_secret_2026';
 
   if (!adminEmail || !adminPassword || !bootstrapSecret) {
     console.error('Error: ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, and ADMIN_BOOTSTRAP_SECRET must be set in environment variables.');
     process.exit(1);
   }
 
-  // Sanitize email
   const cleanEmail = adminEmail.toLowerCase().trim();
-
   const dbUrl = process.env.SUPABASE_DB_URL;
+
   if (!dbUrl) {
     console.error('Error: SUPABASE_DB_URL environment variable is missing.');
     process.exit(1);
@@ -43,16 +37,14 @@ async function bootstrapAdmin() {
   await client.connect();
 
   try {
-    // 1. Check if user exists in auth.users
     const userRes = await client.query(
-      `SELECT id, email FROM auth.users WHERE LOWER(email) = $1`,
+      `SELECT id FROM auth.users WHERE LOWER(email) = $1`,
       [cleanEmail]
     );
 
     let userId;
 
     if (userRes.rows.length === 0) {
-      // 2a. Create new auth user using pgcrypto for encrypted_password
       const insertRes = await client.query(
         `
         INSERT INTO auth.users (
@@ -63,6 +55,9 @@ async function bootstrapAdmin() {
           email,
           encrypted_password,
           email_confirmed_at,
+          confirmation_token,
+          recovery_token,
+          email_change_token_new,
           raw_app_meta_data,
           raw_user_meta_data,
           created_at,
@@ -75,6 +70,9 @@ async function bootstrapAdmin() {
           $1,
           crypt($2, gen_salt('bf')),
           NOW(),
+          '',
+          '',
+          '',
           '{"provider":"email","providers":["email"]}'::jsonb,
           '{"name":"System Administrator","role":"admin","must_change_password":true}'::jsonb,
           NOW(),
@@ -85,7 +83,6 @@ async function bootstrapAdmin() {
       );
       userId = insertRes.rows[0].id;
     } else {
-      // 2b. User exists: update password and metadata
       userId = userRes.rows[0].id;
       await client.query(
         `
@@ -100,7 +97,27 @@ async function bootstrapAdmin() {
       );
     }
 
-    // 3. Ensure profile in public.profiles has role = 'admin'
+    // Ensure identity row exists
+    await client.query(
+      `
+      INSERT INTO auth.identities (
+        id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        $1::uuid,
+        $1::text,
+        json_build_object('sub', $1::text, 'email', $2::text, 'email_verified', true, 'phone_verified', false),
+        'email',
+        NOW(),
+        NOW(),
+        NOW()
+      ) ON CONFLICT (provider_id, provider) DO UPDATE
+      SET updated_at = NOW();
+      `,
+      [userId, cleanEmail]
+    );
+
+    // Ensure profile row in public.profiles
     await client.query(
       `
       INSERT INTO public.profiles (id, name, email, role, created_at, updated_at)
@@ -113,7 +130,6 @@ async function bootstrapAdmin() {
       [userId, cleanEmail]
     );
 
-    // Safe success output without logging email, password, or secret
     console.log('Admin bootstrap completed successfully.');
   } finally {
     await client.end();
