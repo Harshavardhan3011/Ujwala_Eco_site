@@ -162,9 +162,11 @@ export async function createAdminAuthUserPrivileged(params: {
       // 2. Create identity in auth.identities
       await pgClient.query(
         `INSERT INTO auth.identities (
-          id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+          id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at, email
         ) VALUES (
-          gen_random_uuid(), $1::uuid, $1::text, json_build_object('sub', $1::text, 'email', $2::text), 'email', NOW(), NOW(), NOW()
+          gen_random_uuid(), $1::uuid, $1::text,
+          json_build_object('sub', $1::text, 'email', $2::text, 'email_verified', false, 'phone_verified', false)::jsonb,
+          'email', NOW(), NOW(), NOW(), $2::text
         );`,
         [userId, cleanEmail]
       );
