@@ -4,7 +4,19 @@ import { Client } from 'pg';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const dbUrl = process.env.SUPABASE_DB_URL;
+const rawDbUrl = process.env.SUPABASE_DB_URL;
+
+function getValidConnectionString(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.includes('db.ujkhgvhqofdbqwgahslc.supabase.co')) {
+    return url
+      .replace('db.ujkhgvhqofdbqwgahslc.supabase.co', 'aws-0-ap-south-1.pooler.supabase.com')
+      .replace('postgres:', 'postgres.ujkhgvhqofdbqwgahslc:');
+  }
+  return url;
+}
+
+const dbUrl = getValidConnectionString(rawDbUrl);
 
 // Privileged Supabase client (if service role key is set)
 export const getServiceRoleClient = () => {
