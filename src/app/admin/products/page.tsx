@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Package, Plus, Edit, Trash2, Search, X, Check,
-  ChevronLeft, ChevronRight, Star, Loader2, AlertCircle, Upload,
+  ChevronLeft, ChevronRight, Star, Loader2, AlertCircle, Upload, Image as ImageIcon,
 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 
@@ -25,7 +25,7 @@ const EMPTY_FORM = {
   categoryId: '', price: '', discountPrice: '', stockQuantity: '100',
   minOrderQuantity: '5', material: '100% Natural Jute', dimensions: '',
   weight: '', isCustomizable: false, isFeatured: false, isBestseller: false,
-  tags: '', imageUrl: '',
+  tags: '', images: [] as string[],
 };
 
 type Product = {
@@ -54,6 +54,7 @@ export default function AdminProductsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const fetchProducts = useCallback(async () => {
@@ -95,6 +96,7 @@ export default function AdminProductsPage() {
       sku: `UJW-${Date.now().toString().slice(-5)}`,
       categoryId: categories[0]?.id || '',
       isCustomizable: true, isFeatured: false, isBestseller: false,
+      images: [],
     });
     setFormError('');
     setIsModalOpen(true);
@@ -109,23 +111,70 @@ export default function AdminProductsPage() {
       stockQuantity: String(p.stockQuantity), minOrderQuantity: String(p.minOrderQuantity),
       material: p.material || '', dimensions: p.dimensions || '', weight: p.weight || '',
       isCustomizable: p.isCustomizable, isFeatured: p.isFeatured, isBestseller: p.isBestseller,
-      tags: p.tags || '', imageUrl: p.images[0]?.imageUrl || '',
+      tags: p.tags || '', images: p.images ? p.images.map(img => img.imageUrl) : [],
     });
     setFormError('');
     setIsModalOpen(true);
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const uploadFiles = async (files: FileList | File[]) => {
+    const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (validFiles.length === 0) return;
+
     setUploadingImage(true);
+    setFormError('');
+
     try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch('/api/admin/upload', { method: 'POST', body: form });
-      const data = await res.json();
-      if (data.imageUrl) setFormData(prev => ({ ...prev, imageUrl: data.imageUrl }));
-    } catch { /* ignore */ } finally { setUploadingImage(false); }
+      const uploadPromises = validFiles.map(async (file) => {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('bucket', 'products');
+        const res = await fetch('/api/admin/upload', { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        return data.imageUrl as string;
+      });
+
+      const uploadedUrls = await Promise.all(uploadPromises);
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...uploadedUrls.filter(Boolean)],
+      }));
+    } catch (err: any) {
+      setFormError(err.message || 'Image upload failed. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const removeImage = (indexToRemove: number) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, idx) => idx !== indexToRemove),
+    }));
+  };
+
+  const setPrimaryImage = (indexToPrimary: number) => {
+    setFormData(prev => {
+      const target = prev.images[indexToPrimary];
+      const rest = prev.images.filter((_, idx) => idx !== indexToPrimary);
+      return {
+        ...prev,
+        images: [target, ...rest],
+      };
+    });
+  };
+
+  const moveImage = (index: number, direction: 'left' | 'right') => {
+    setFormData(prev => {
+      const newImages = [...prev.images];
+      const targetIndex = direction === 'left' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= newImages.length) return prev;
+      const temp = newImages[index];
+      newImages[index] = newImages[targetIndex];
+      newImages[targetIndex] = temp;
+      return { ...prev, images: newImages };
+    });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -133,7 +182,10 @@ export default function AdminProductsPage() {
     setIsSubmitting(true);
     setFormError('');
     try {
-      const payload = { ...formData, images: formData.imageUrl ? [formData.imageUrl] : [] };
+      const payload = {
+        ...formData,
+        images: formData.images,
+      };
       const url = editingId ? `/api/products/${editingId}` : '/api/products';
       const res = await fetch(url, {
         method: editingId ? 'PUT' : 'POST',
@@ -243,7 +295,7 @@ export default function AdminProductsPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg bg-canvas-100 border border-eco-100 overflow-hidden shrink-0">
-                            {p.images[0]?.imageUrl ? (
+                            {p.images && p.images[0]?.imageUrl ? (
                               <img src={p.images[0].imageUrl} alt={p.name} className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
@@ -433,28 +485,130 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* Image */}
+              {/* Product Images (Drag & Drop + Supabase Storage Upload) */}
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Product Image</p>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl border border-eco-200 bg-canvas-100 overflow-hidden shrink-0">
-                    {formData.imageUrl ? (
-                      <img src={formData.imageUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-6 h-6 text-eco-300" />
-                      </div>
-                    )}
-                  </div>
-                  <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-eco-300 rounded-lg text-sm text-eco-700 font-medium hover:bg-eco-50 cursor-pointer transition-colors">
-                    {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    {uploadingImage ? 'Uploading…' : 'Upload Image'}
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                  </label>
-                  {formData.imageUrl && (
-                    <button type="button" onClick={() => setFormData(p => ({ ...p, imageUrl: '' }))} className="text-xs text-slate-400 hover:text-rose-500">Remove</button>
-                  )}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Product Images ({formData.images.length})
+                  </p>
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    First image will be used as the primary display image
+                  </span>
                 </div>
+
+                {/* Drag and Drop Zone */}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    if (e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
+                  }}
+                  className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+                    isDragging
+                      ? 'border-eco-600 bg-eco-50 scale-[1.005]'
+                      : 'border-eco-200 bg-canvas-50 hover:border-eco-400 hover:bg-canvas-100'
+                  }`}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={(e) => e.target.files && uploadFiles(e.target.files)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    disabled={uploadingImage}
+                  />
+                  <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
+                    <div className="w-12 h-12 rounded-full bg-eco-100 flex items-center justify-center text-eco-700 shadow-xs">
+                      {uploadingImage ? (
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                      ) : (
+                        <Upload className="w-6 h-6" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {uploadingImage ? 'Uploading images to Supabase Storage…' : 'Drag & drop product images here'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        or <span className="text-eco-700 font-bold underline">Choose Images</span> from your computer
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      JPG, JPEG, PNG, WEBP supported. Multiple images allowed.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Uploaded Image Gallery Grid */}
+                {formData.images.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+                    {formData.images.map((url, idx) => (
+                      <div
+                        key={`${url}-${idx}`}
+                        className="group relative rounded-xl border border-eco-200 bg-white overflow-hidden shadow-xs hover:shadow-md transition-all"
+                      >
+                        <div className="aspect-square w-full bg-slate-100 relative overflow-hidden">
+                          <img
+                            src={url}
+                            alt={`Product Preview ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+
+                          {/* Primary Badge or Set Primary Action */}
+                          {idx === 0 ? (
+                            <span className="absolute top-2 left-2 bg-eco-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                              <Star className="w-2.5 h-2.5 fill-current" /> Primary
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setPrimaryImage(idx)}
+                              className="absolute top-2 left-2 bg-slate-900/75 hover:bg-eco-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                            >
+                              Make Primary
+                            </button>
+                          )}
+
+                          {/* Delete/Remove Button */}
+                          <button
+                            type="button"
+                            onClick={() => removeImage(idx)}
+                            className="absolute top-2 right-2 bg-rose-600/90 hover:bg-rose-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                            title="Remove image"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Reorder Arrows */}
+                          {formData.images.length > 1 && (
+                            <div className="absolute bottom-2 inset-x-2 flex justify-between opacity-0 group-hover:opacity-100 transition-all">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => moveImage(idx, 'left')}
+                                className="bg-slate-900/75 hover:bg-slate-900 text-white p-1 rounded-md disabled:opacity-30 transition-colors"
+                                title="Move left"
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === formData.images.length - 1}
+                                onClick={() => moveImage(idx, 'right')}
+                                className="bg-slate-900/75 hover:bg-slate-900 text-white p-1 rounded-md disabled:opacity-30 transition-colors"
+                                title="Move right"
+                              >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Flags */}
@@ -478,7 +632,7 @@ export default function AdminProductsPage() {
 
               <div className="flex gap-3 pt-2 border-t border-eco-50">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-canvas-50">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 py-2.5 bg-eco-700 hover:bg-eco-800 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+                <button type="submit" disabled={isSubmitting || uploadingImage} className="flex-1 py-2.5 bg-eco-700 hover:bg-eco-800 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
                   {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</> : <><Check className="w-4 h-4" />{editingId ? 'Update Product' : 'Create Product'}</>}
                 </button>
               </div>

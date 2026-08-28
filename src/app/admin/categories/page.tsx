@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FolderTree, Plus, Edit, Trash2, X, Loader2, AlertCircle, Check } from 'lucide-react';
+import { FolderTree, Plus, Edit, Trash2, X, Loader2, AlertCircle, Check, Upload } from 'lucide-react';
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -16,6 +16,7 @@ export default function AdminCategoriesPage() {
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
   const [displayOrder, setDisplayOrder] = useState('1');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const fetchCategories = async () => {
     setIsLoading(true);
@@ -38,6 +39,26 @@ export default function AdminCategoriesPage() {
     setEditingId(c.id); setName(c.name); setDescription(c.description || '');
     setImage(c.image || ''); setDisplayOrder(String(c.displayOrder || 1));
     setFormError(''); setIsModalOpen(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    setFormError('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('bucket', 'products');
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      if (data.imageUrl) setImage(data.imageUrl);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to upload category image.');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -187,17 +208,34 @@ export default function AdminCategoriesPage() {
                 <textarea rows={2} value={description} onChange={e => setDescription(e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Image URL (Supabase Storage)</label>
-                <input type="text" value={image} onChange={e => setImage(e.target.value)} className={inputCls} placeholder="https://..." />
-                {image && <img src={image} alt="" className="mt-2 h-16 w-16 object-cover rounded-lg border border-eco-200" />}
+                <label className={labelCls}>Category Image</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl border border-eco-200 bg-canvas-100 overflow-hidden shrink-0">
+                    {image ? (
+                      <img src={image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <FolderTree className="w-6 h-6 text-eco-300" />
+                      </div>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-eco-300 rounded-lg text-sm text-eco-700 font-semibold hover:bg-eco-50 cursor-pointer transition-colors">
+                    {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploadingImage ? 'Uploading…' : 'Choose Image'}
+                    <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handleImageUpload} className="hidden" />
+                  </label>
+                  {image && (
+                    <button type="button" onClick={() => setImage('')} className="text-xs text-slate-400 hover:text-rose-500 font-medium">Remove</button>
+                  )}
+                </div>
               </div>
               <div>
                 <label className={labelCls}>Display Order</label>
                 <input type="number" min="1" value={displayOrder} onChange={e => setDisplayOrder(e.target.value)} className={inputCls} />
               </div>
               <div className="flex gap-3 pt-2 border-t border-eco-50">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 py-2.5 bg-eco-700 hover:bg-eco-800 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-medium">Cancel</button>
+                <button type="submit" disabled={isSubmitting || uploadingImage} className="flex-1 py-2.5 bg-eco-700 hover:bg-eco-800 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
                   {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</> : <><Check className="w-4 h-4" />{editingId ? 'Update' : 'Create'}</>}
                 </button>
               </div>
