@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -45,7 +45,7 @@ export async function executePrivilegedQuery<T = any>(text: string, params: any[
 
   let lastError: any = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
-    let client;
+    let client: PoolClient | undefined;
     try {
       client = await pool.connect();
       const res = await client.query(text, params);
@@ -72,6 +72,29 @@ export async function executePrivilegedQuery<T = any>(text: string, params: any[
 export async function executePrivilegedQueryOne<T = any>(text: string, params: any[] = []): Promise<T | null> {
   const rows = await executePrivilegedQuery<T>(text, params);
   return rows[0] || null;
+}
+
+/**
+ * Execute a multi-statement transaction with automatic rollback on error.
+ */
+export async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
+  const pool = getPgPool();
+  if (!pool) {
+    throw new Error('Database connection URL (SUPABASE_DB_URL) is not configured on server');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // Privileged Supabase client (if service role key is set)
@@ -122,37 +145,40 @@ export async function adminUpdateProduct(id: string, payload: any, images?: stri
     RETURNING *;
   `;
 
-  const updatedProduct = await executePrivilegedQueryOne(queryText, params);
-  if (!updatedProduct) {
-    throw new Error('Product not found or update failed');
-  }
-
-  // Handle product images if provided
-  if (images && Array.isArray(images)) {
-    await executePrivilegedQuery('DELETE FROM public.product_images WHERE product_id = $1;', [id]);
-    for (let i = 0; i < images.length; i++) {
-      await executePrivilegedQuery(
-        `INSERT INTO public.product_images (product_id, image_url, alt_text, is_primary, display_order)
-         VALUES ($1, $2, $3, $4, $5);`,
-        [id, images[i], `${updatedProduct.name} Image ${i + 1}`, i === 0, i]
-      );
+  return withTransaction(async (client) => {
+    const updateRes = await client.query(queryText, params);
+    const updatedProduct = updateRes.rows[0];
+    if (!updatedProduct) {
+      throw new Error('Product not found or update failed');
     }
-  }
 
-  // Return product with images & category
-  const imagesList = await executePrivilegedQuery(
-    'SELECT * FROM public.product_images WHERE product_id = $1 ORDER BY display_order ASC;',
-    [id]
-  );
-  const category = updatedProduct.category_id
-    ? await executePrivilegedQueryOne('SELECT * FROM public.categories WHERE id = $1;', [updatedProduct.category_id])
-    : null;
+    // Handle product images transactionally
+    if (images && Array.isArray(images)) {
+      await client.query('DELETE FROM public.product_images WHERE product_id = $1;', [id]);
+      for (let i = 0; i < images.length; i++) {
+        await client.query(
+          `INSERT INTO public.product_images (product_id, image_url, alt_text, is_primary, display_order)
+           VALUES ($1, $2, $3, $4, $5);`,
+          [id, images[i], `${updatedProduct.name} Image ${i + 1}`, i === 0, i]
+        );
+      }
+    }
 
-  return {
-    ...updatedProduct,
-    images: imagesList,
-    category,
-  };
+    const imagesRes = await client.query(
+      'SELECT * FROM public.product_images WHERE product_id = $1 ORDER BY display_order ASC;',
+      [id]
+    );
+
+    const categoryRes = updatedProduct.category_id
+      ? await client.query('SELECT * FROM public.categories WHERE id = $1;', [updatedProduct.category_id])
+      : { rows: [] };
+
+    return {
+      ...updatedProduct,
+      images: imagesRes.rows,
+      category: categoryRes.rows[0] || null,
+    };
+  });
 }
 
 export async function adminCreateProduct(payload: any, images?: string[]) {
@@ -198,31 +224,37 @@ export async function adminCreateProduct(payload: any, images?: string[]) {
     payload.seo_description || null,
   ];
 
-  const product = await executePrivilegedQueryOne(insertSql, params);
-  if (!product) throw new Error('Failed to insert product record');
+  return withTransaction(async (client) => {
+    const insertRes = await client.query(insertSql, params);
+    const product = insertRes.rows[0];
+    if (!product) throw new Error('Failed to insert product record');
 
-  if (images && Array.isArray(images)) {
-    for (let i = 0; i < images.length; i++) {
-      await executePrivilegedQuery(
-        `INSERT INTO public.product_images (product_id, image_url, alt_text, is_primary, display_order)
-         VALUES ($1, $2, $3, $4, $5);`,
-        [product.id, images[i], `${product.name} Image ${i + 1}`, i === 0, i]
-      );
+    if (images && Array.isArray(images)) {
+      for (let i = 0; i < images.length; i++) {
+        await client.query(
+          `INSERT INTO public.product_images (product_id, image_url, alt_text, is_primary, display_order)
+           VALUES ($1, $2, $3, $4, $5);`,
+          [product.id, images[i], `${product.name} Image ${i + 1}`, i === 0, i]
+        );
+      }
     }
-  }
 
-  const imagesList = await executePrivilegedQuery(
-    'SELECT * FROM public.product_images WHERE product_id = $1 ORDER BY display_order ASC;',
-    [product.id]
-  );
-  return { ...product, images: imagesList };
+    const imagesRes = await client.query(
+      'SELECT * FROM public.product_images WHERE product_id = $1 ORDER BY display_order ASC;',
+      [product.id]
+    );
+
+    return { ...product, images: imagesRes.rows };
+  });
 }
 
 export async function adminDeleteProduct(id: string) {
-  await executePrivilegedQuery('DELETE FROM public.product_images WHERE product_id = $1;', [id]);
-  await executePrivilegedQuery('DELETE FROM public.product_variants WHERE product_id = $1;', [id]);
-  await executePrivilegedQuery('DELETE FROM public.products WHERE id = $1;', [id]);
-  return true;
+  return withTransaction(async (client) => {
+    await client.query('DELETE FROM public.product_images WHERE product_id = $1;', [id]);
+    await client.query('DELETE FROM public.product_variants WHERE product_id = $1;', [id]);
+    await client.query('DELETE FROM public.products WHERE id = $1;', [id]);
+    return true;
+  });
 }
 
 // ==========================================
@@ -374,21 +406,23 @@ export async function customerGetWishlist(userId: string) {
 }
 
 export async function customerToggleWishlist(userId: string, productId: string) {
-  const existing = await executePrivilegedQueryOne(
-    'SELECT id FROM public.wishlist_items WHERE user_id = $1 AND product_id = $2;',
-    [userId, productId]
-  );
-
-  if (existing) {
-    await executePrivilegedQuery('DELETE FROM public.wishlist_items WHERE id = $1;', [existing.id]);
-    return { inWishlist: false, message: 'Removed from wishlist' };
-  } else {
-    await executePrivilegedQuery(
-      'INSERT INTO public.wishlist_items (user_id, product_id) VALUES ($1, $2);',
+  return withTransaction(async (client) => {
+    const existing = await client.query(
+      'SELECT id FROM public.wishlist_items WHERE user_id = $1 AND product_id = $2;',
       [userId, productId]
     );
-    return { inWishlist: true, message: 'Added to wishlist' };
-  }
+
+    if (existing.rows && existing.rows.length > 0) {
+      await client.query('DELETE FROM public.wishlist_items WHERE id = $1;', [existing.rows[0].id]);
+      return { inWishlist: false, message: 'Removed from wishlist' };
+    } else {
+      await client.query(
+        'INSERT INTO public.wishlist_items (user_id, product_id) VALUES ($1, $2);',
+        [userId, productId]
+      );
+      return { inWishlist: true, message: 'Added to wishlist' };
+    }
+  });
 }
 
 // ==========================================
@@ -472,51 +506,49 @@ export async function createAdminAuthUserPrivileged(params: {
   const cleanEmail = params.email.toLowerCase().trim();
 
   try {
-    // Check if email already exists in auth.users
-    const existing = await executePrivilegedQueryOne(
-      'SELECT id FROM auth.users WHERE LOWER(email) = $1 LIMIT 1;',
-      [cleanEmail]
-    );
+    return await withTransaction(async (client) => {
+      // Check if email already exists in auth.users
+      const existing = await client.query(
+        'SELECT id FROM auth.users WHERE LOWER(email) = $1 LIMIT 1;',
+        [cleanEmail]
+      );
 
-    if (existing) {
-      return { success: false, error: 'An account with this email already exists' };
-    }
+      if (existing.rows && existing.rows.length > 0) {
+        return { success: false, error: 'An account with this email already exists' };
+      }
 
-    // 1. Create user in auth.users
-    const createUserRes = await executePrivilegedQueryOne<{ id: string }>(
-      `INSERT INTO auth.users (
-        id, instance_id, email, encrypted_password, email_confirmed_at,
-        confirmation_token, recovery_token, email_change_token_new, email_change, phone_change, phone_change_token,
-        raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
-      ) VALUES (
-        gen_random_uuid(), '00000000-0000-0000-0000-000000000000', $1, crypt($2, gen_salt('bf', 10)), NOW(),
-        '', '', '', '', '', '',
-        '{"provider":"email","providers":["email"]}'::jsonb,
-        json_build_object('name', $3::text, 'phone', $4::text, 'role', 'admin')::jsonb,
-        NOW(), NOW(), 'authenticated', 'authenticated'
-      ) RETURNING id;`,
-      [cleanEmail, params.password, params.name || '', params.phone || '']
-    );
+      // 1. Create user in auth.users
+      const createUserRes = await client.query(
+        `INSERT INTO auth.users (
+          id, instance_id, email, encrypted_password, email_confirmed_at,
+          confirmation_token, recovery_token, email_change_token_new, email_change, phone_change, phone_change_token,
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
+        ) VALUES (
+          gen_random_uuid(), '00000000-0000-0000-0000-000000000000', $1, crypt($2, gen_salt('bf', 10)), NOW(),
+          '', '', '', '', '', '',
+          '{"provider":"email","providers":["email"]}'::jsonb,
+          json_build_object('name', $3::text, 'phone', $4::text, 'role', 'admin')::jsonb,
+          NOW(), NOW(), 'authenticated', 'authenticated'
+        ) RETURNING id;`,
+        [cleanEmail, params.password, params.name || '', params.phone || '']
+      );
 
-    if (!createUserRes) {
-      return { success: false, error: 'Failed to insert auth user record' };
-    }
+      const userId = createUserRes.rows[0].id;
 
-    const userId = createUserRes.id;
+      // 2. Create identity in auth.identities
+      await client.query(
+        `INSERT INTO auth.identities (
+          id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+        ) VALUES (
+          gen_random_uuid(), $1::uuid, $1::text,
+          json_build_object('sub', $1::text, 'email', $2::text, 'email_verified', false, 'phone_verified', false)::jsonb,
+          'email', NOW(), NOW(), NOW()
+        );`,
+        [userId, cleanEmail]
+      );
 
-    // 2. Create identity in auth.identities
-    await executePrivilegedQuery(
-      `INSERT INTO auth.identities (
-        id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
-      ) VALUES (
-        gen_random_uuid(), $1::uuid, $1::text,
-        json_build_object('sub', $1::text, 'email', $2::text, 'email_verified', false, 'phone_verified', false)::jsonb,
-        'email', NOW(), NOW(), NOW()
-      );`,
-      [userId, cleanEmail]
-    );
-
-    return { success: true, userId };
+      return { success: true, userId };
+    });
   } catch (err: any) {
     console.error('[SERVER_DB] createAdminAuthUser error:', err.message);
     return { success: false, error: err.message };
@@ -554,10 +586,12 @@ export async function upsertAdminProfilePrivileged(params: {
 
 export async function deleteAdminUserPrivileged(userId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    await executePrivilegedQuery('DELETE FROM public.profiles WHERE id = $1;', [userId]);
-    await executePrivilegedQuery('DELETE FROM auth.identities WHERE user_id = $1;', [userId]);
-    await executePrivilegedQuery('DELETE FROM auth.users WHERE id = $1;', [userId]);
-    return { success: true };
+    return await withTransaction(async (client) => {
+      await client.query('DELETE FROM public.profiles WHERE id = $1;', [userId]);
+      await client.query('DELETE FROM auth.identities WHERE user_id = $1;', [userId]);
+      await client.query('DELETE FROM auth.users WHERE id = $1;', [userId]);
+      return { success: true };
+    });
   } catch (err: any) {
     console.error('[SERVER_DB] deleteAdminUser error:', err.message);
     return { success: false, error: err.message };

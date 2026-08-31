@@ -34,22 +34,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# private development, test, and admin bootstrap scripts
-scripts/bootstrap-admin.js
-scripts/configure-superadmin.js
-scripts/debug-auth-error.js
-scripts/diagnose-login.js
-scripts/recreate-admin-account.js
-scripts/test-admin-provisioning.js
-scripts/test-admin-security.js
-scripts/test-full-auth-flow.js
-scripts/test-gotrue-queries.js
-scripts/test-live-login.js
-scripts/test-login-debug.js
-scripts/test-rls.js
-scripts/test-superadmin-security.js
-scripts/test-order-payment-system.js
-scripts/diagnose-db-privileges.js
-scripts/test-pg-pool.js
-scripts/test-admin-crud-permissions.js
-scripts/test-connection.js
+# private development, test, and admin bootstrap scripts (kept locally, ignored in git)
+scripts/*.js

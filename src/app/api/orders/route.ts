@@ -3,7 +3,7 @@ import {
   adminGetOrders,
   customerGetOrders,
   executePrivilegedQuery,
-  executePrivilegedQueryOne,
+  withTransaction,
 } from '@/lib/serverDb';
 import { createPaymentOrder, isRazorpayConfigured } from '@/lib/razorpay';
 import { NextRequest, NextResponse } from 'next/server';
@@ -119,94 +119,95 @@ export async function POST(req: NextRequest) {
     const initialOrderStatus = isCod ? 'CONFIRMED' : 'PENDING';
     const initialPaymentStatus = 'PENDING';
 
-    // 1. Create internal order in Supabase
-    const insertOrderSql = `
-      INSERT INTO public.orders (
-        order_number, user_id, shipping_name, shipping_phone, shipping_address,
-        shipping_city, shipping_state, shipping_postal_code, subtotal, shipping_fee,
-        total_amount, order_status, payment_status, payment_method, customization_notes,
-        custom_file_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-      RETURNING *;
-    `;
-
-    const order = await executePrivilegedQueryOne(insertOrderSql, [
-      orderNumber,
-      session.userId,
-      shippingName.trim(),
-      shippingPhone.trim(),
-      shippingAddress.trim(),
-      shippingCity.trim(),
-      shippingState?.trim() || 'Andhra Pradesh',
-      shippingPostalCode.trim(),
-      subtotal,
-      shippingFee,
-      totalAmount,
-      initialOrderStatus,
-      initialPaymentStatus,
-      paymentMethod,
-      customizationNotes || null,
-      customFileUrl || null,
-    ]);
-
-    if (!order) {
-      throw new Error('Failed to create order record in database.');
-    }
-
-    // 2. Insert order items
-    for (const item of orderItemsData) {
-      await executePrivilegedQuery(`
-        INSERT INTO public.order_items (order_id, product_id, product_name, product_sku, price, quantity, customization_notes)
-        VALUES ($1, $2, $3, $4, $5, $6, $7);
-      `, [order.id, item.product_id, item.product_name, item.product_sku, item.price, item.quantity, item.customization_notes]);
-    }
-
-    // 3. Handle payment method specific processing
-    let razorpayOrder = null;
-
+    let razorpayOrder: any = null;
     if (paymentMethod === 'RAZORPAY') {
       try {
         razorpayOrder = await createPaymentOrder({
           amount: totalAmount,
-          receipt: order.order_number,
-          notes: { orderId: order.id, customerName: shippingName },
+          receipt: orderNumber,
+          notes: { customerName: shippingName },
         });
-
-        await executePrivilegedQuery(`
-          INSERT INTO public.payments (order_id, razorpay_order_id, amount, status)
-          VALUES ($1, $2, $3, $4);
-        `, [order.id, razorpayOrder.id, totalAmount, 'PENDING']);
       } catch (rzpErr: any) {
         console.error('Razorpay order creation error:', rzpErr);
-        // Rollback order if razorpay creation fails
-        await executePrivilegedQuery('DELETE FROM public.orders WHERE id = $1;', [order.id]);
         return NextResponse.json({
           error: rzpErr.message || 'Failed to initialize payment gateway. Please try again or choose COD.',
         }, { status: 400 });
       }
-    } else {
-      // For COD: create pending payment record
-      await executePrivilegedQuery(`
-        INSERT INTO public.payments (order_id, amount, status)
-        VALUES ($1, $2, $3);
-      `, [order.id, totalAmount, 'PENDING']);
-
-      // Deduct stock for COD confirmed order
-      for (const item of orderItemsData) {
-        await executePrivilegedQuery(`
-          UPDATE public.products
-          SET stock_quantity = GREATEST(0, stock_quantity - $1)
-          WHERE id = $2;
-        `, [item.quantity, item.product_id]);
-      }
     }
 
-    // 4. Clear user's cart
-    await executePrivilegedQuery('DELETE FROM public.cart_items WHERE user_id = $1;', [session.userId]);
+    // Execute order creation transactionally
+    const createdOrder = await withTransaction(async (client) => {
+      // 1. Create internal order
+      const insertOrderSql = `
+        INSERT INTO public.orders (
+          order_number, user_id, shipping_name, shipping_phone, shipping_address,
+          shipping_city, shipping_state, shipping_postal_code, subtotal, shipping_fee,
+          total_amount, order_status, payment_status, payment_method, customization_notes,
+          custom_file_url
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        RETURNING *;
+      `;
+
+      const orderRes = await client.query(insertOrderSql, [
+        orderNumber,
+        session.userId,
+        shippingName.trim(),
+        shippingPhone.trim(),
+        shippingAddress.trim(),
+        shippingCity.trim(),
+        shippingState?.trim() || 'Andhra Pradesh',
+        shippingPostalCode.trim(),
+        subtotal,
+        shippingFee,
+        totalAmount,
+        initialOrderStatus,
+        initialPaymentStatus,
+        paymentMethod,
+        customizationNotes || null,
+        customFileUrl || null,
+      ]);
+
+      const order = orderRes.rows[0];
+
+      // 2. Insert order items
+      for (const item of orderItemsData) {
+        await client.query(`
+          INSERT INTO public.order_items (order_id, product_id, product_name, product_sku, price, quantity, customization_notes)
+          VALUES ($1, $2, $3, $4, $5, $6, $7);
+        `, [order.id, item.product_id, item.product_name, item.product_sku, item.price, item.quantity, item.customization_notes]);
+      }
+
+      // 3. Insert payment record
+      if (paymentMethod === 'RAZORPAY' && razorpayOrder) {
+        await client.query(`
+          INSERT INTO public.payments (order_id, razorpay_order_id, amount, status)
+          VALUES ($1, $2, $3, $4);
+        `, [order.id, razorpayOrder.id, totalAmount, 'PENDING']);
+      } else {
+        await client.query(`
+          INSERT INTO public.payments (order_id, amount, status)
+          VALUES ($1, $2, $3);
+        `, [order.id, totalAmount, 'PENDING']);
+
+        // Deduct stock for COD confirmed order
+        for (const item of orderItemsData) {
+          await client.query(`
+            UPDATE public.products
+            SET stock_quantity = GREATEST(0, stock_quantity - $1)
+            WHERE id = $2;
+          `, [item.quantity, item.product_id]);
+        }
+      }
+
+      // 4. Clear user's cart
+      await client.query('DELETE FROM public.cart_items WHERE user_id = $1;', [session.userId]);
+
+      return order;
+    });
 
     return NextResponse.json({
       order: {
-        ...order,
+        ...createdOrder,
         items: orderItemsData,
       },
       razorpayOrder,
