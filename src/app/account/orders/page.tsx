@@ -45,62 +45,71 @@ export default function OrderHistoryPage() {
           <Package className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="font-serif font-bold text-lg text-slate-800">No Orders Placed Yet</h3>
           <p className="text-xs text-slate-500">When you place an order, its details and live status will appear here.</p>
-          <Link href="/shop" className="inline-block bg-eco-700 text-white text-xs font-bold px-6 py-2.5 rounded-full">
+          <Link href="/shop" className="inline-block bg-eco-700 hover:bg-eco-800 text-white text-xs font-bold px-6 py-2.5 rounded-full transition-colors">
             Start Shopping
           </Link>
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              className="bg-white p-6 rounded-3xl border border-eco-100 shadow-xs space-y-4 hover:border-eco-300 transition-colors"
-            >
-              <div className="flex flex-wrap justify-between items-center gap-2 border-b border-eco-50 pb-3 text-xs">
-                <div>
-                  <span className="font-bold text-slate-900 block text-sm">Order #{order.orderNumber}</span>
-                  <span className="text-slate-500">Placed on {formatDate(order.createdAt)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full font-bold text-[11px] ${
-                    order.orderStatus === 'DELIVERED'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : order.orderStatus === 'CANCELLED'
-                      ? 'bg-rose-100 text-rose-800'
-                      : 'bg-amber-100 text-amber-900'
-                  }`}>
-                    {order.orderStatus}
-                  </span>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                    order.paymentStatus === 'PAID' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    Payment: {order.paymentStatus}
-                  </span>
-                </div>
-              </div>
+          {orders.map((order) => {
+            const orderNum = order.order_number || order.orderNumber;
+            const orderStat = order.order_status || order.orderStatus || 'PENDING';
+            const payStat = order.payment_status || order.paymentStatus || 'PENDING';
+            const createdAt = order.created_at || order.createdAt;
+            const totalAmt = order.total_amount ?? order.totalAmount;
+            const items = order.items || [];
 
-              <div className="space-y-2">
-                {order.items.map((item: any) => (
-                  <div key={item.id} className="flex justify-between text-xs text-slate-700">
-                    <span>{item.quantity}x {item.productName}</span>
-                    <span className="font-bold">{formatPrice(item.price * item.quantity)}</span>
+            return (
+              <div
+                key={order.id}
+                className="bg-white p-6 rounded-3xl border border-eco-100 shadow-xs space-y-4 hover:border-eco-300 transition-colors"
+              >
+                <div className="flex flex-wrap justify-between items-center gap-2 border-b border-eco-50 pb-3 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-900 block text-sm">Order #{orderNum}</span>
+                    <span className="text-slate-500">Placed on {formatDate(createdAt)}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full font-bold text-[11px] ${
+                      orderStat === 'DELIVERED'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : orderStat === 'CANCELLED'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-amber-100 text-amber-900'
+                    }`}>
+                      {orderStat.replace('_', ' ')}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                      payStat === 'PAID' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      Payment: {payStat}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="flex justify-between items-center pt-3 border-t border-eco-50">
-                <span className="font-serif font-bold text-sm text-eco-900">
-                  Total: {formatPrice(order.totalAmount)}
-                </span>
-                <Link
-                  href={`/account/orders/${order.id}`}
-                  className="bg-eco-50 hover:bg-eco-100 text-eco-800 text-xs font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-1"
-                >
-                  View Details & Track <ChevronRight className="w-4 h-4" />
-                </Link>
+                <div className="space-y-2">
+                  {items.map((item: any) => (
+                    <div key={item.id} className="flex justify-between text-xs text-slate-700">
+                      <span>{item.quantity}x {item.product_name || item.productName}</span>
+                      <span className="font-bold">{formatPrice(item.price * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-eco-50">
+                  <span className="font-serif font-bold text-sm text-eco-900">
+                    Total: {formatPrice(totalAmt)}
+                  </span>
+                  <Link
+                    href={`/account/orders/${order.id}`}
+                    className="bg-eco-50 hover:bg-eco-100 text-eco-800 text-xs font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-1"
+                  >
+                    View Details & Track <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

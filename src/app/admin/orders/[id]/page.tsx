@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Package, MapPin, User, CreditCard, Clock, Loader2, AlertCircle, Check } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, User, CreditCard, Clock, Loader2, AlertCircle, Check, Banknote } from 'lucide-react';
 import { formatPrice, formatDate } from '@/lib/utils';
-
 import { useAdminPath } from '@/lib/useAdminPath';
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
@@ -38,8 +37,8 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         const data = await res.json();
         if (data.order) {
           setOrder(data.order);
-          setOrderStatus(data.order.orderStatus);
-          setPaymentStatus(data.order.paymentStatus);
+          setOrderStatus(data.order.order_status || data.order.orderStatus || 'PENDING');
+          setPaymentStatus(data.order.payment_status || data.order.paymentStatus || 'PENDING');
         } else {
           setError('Order not found');
         }
@@ -91,6 +90,17 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     );
   }
 
+  const orderNum = order.order_number || order.orderNumber;
+  const orderStat = (order.order_status || order.orderStatus || 'PENDING').toUpperCase();
+  const payStat = (order.payment_status || order.paymentStatus || 'PENDING').toUpperCase();
+  const payMethod = (order.payment_method || order.paymentMethod || 'COD').toUpperCase();
+  const orderDate = order.created_at || order.createdAt;
+  const totalAmt = order.total_amount ?? order.totalAmount;
+  const subtotal = order.subtotal ?? 0;
+  const shippingFee = order.shipping_fee ?? order.shippingFee ?? 0;
+  const items = order.items || [];
+  const isCod = payMethod === 'COD';
+
   const inputCls = 'border border-eco-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-eco-500 bg-canvas-50';
 
   return (
@@ -101,11 +111,11 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1">
-          <h1 className="text-lg font-bold text-slate-900">Order #{order.orderNumber}</h1>
-          <p className="text-xs text-slate-500">{formatDate(order.createdAt)}</p>
+          <h1 className="text-lg font-bold text-slate-900">Order #{orderNum}</h1>
+          <p className="text-xs text-slate-500">{formatDate(orderDate)}</p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${ORDER_STATUS_COLORS[order.orderStatus] || 'bg-slate-100 text-slate-600'}`}>
-          {order.orderStatus?.replace('_', ' ')}
+        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${ORDER_STATUS_COLORS[orderStat] || 'bg-slate-100 text-slate-600'}`}>
+          {orderStat.replace('_', ' ')}
         </span>
       </div>
 
@@ -116,19 +126,19 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           <div className="bg-white rounded-xl border border-eco-100 overflow-hidden">
             <div className="flex items-center gap-2 px-5 py-4 border-b border-eco-50">
               <Package className="w-4 h-4 text-eco-700" />
-              <h2 className="font-semibold text-sm text-slate-900">Order Items</h2>
+              <h2 className="font-semibold text-sm text-slate-900">Order Items ({items.length})</h2>
             </div>
             <div className="divide-y divide-eco-50">
-              {(order.items || []).map((item: any) => (
+              {items.map((item: any) => (
                 <div key={item.id} className="flex items-center gap-4 px-5 py-4">
                   <div className="w-12 h-12 rounded-lg bg-canvas-100 border border-eco-100 shrink-0 flex items-center justify-center">
                     <Package className="w-5 h-5 text-eco-300" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{item.productName}</p>
-                    <p className="text-xs text-slate-400">SKU: {item.productSku} · Qty: {item.quantity}</p>
-                    {item.customizationNotes && (
-                      <p className="text-xs text-jute-700 mt-0.5 bg-jute-50 px-2 py-1 rounded">Custom: {item.customizationNotes}</p>
+                    <p className="text-sm font-semibold text-slate-900 truncate">{item.product_name || item.productName}</p>
+                    <p className="text-xs text-slate-400">SKU: {item.product_sku || item.productSku} · Qty: {item.quantity}</p>
+                    {item.customization_notes && (
+                      <p className="text-xs text-jute-700 mt-0.5 bg-jute-50 px-2 py-1 rounded">Custom: {item.customization_notes}</p>
                     )}
                   </div>
                   <div className="text-right shrink-0">
@@ -138,9 +148,19 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                 </div>
               ))}
             </div>
-            <div className="px-5 py-3 bg-canvas-50 border-t border-eco-50 flex justify-between items-center">
-              <span className="text-sm font-semibold text-slate-700">Total</span>
-              <span className="text-base font-bold text-slate-900">{formatPrice(order.totalAmount)}</span>
+            <div className="px-5 py-3 bg-canvas-50 border-t border-eco-50 space-y-1 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Delivery</span>
+                <span>{Number(shippingFee) === 0 ? <span className="text-emerald-700 font-bold">FREE</span> : formatPrice(shippingFee)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm font-bold text-slate-900 pt-2 border-t border-eco-100">
+                <span>Total</span>
+                <span className="text-base text-eco-900 font-bold">{formatPrice(totalAmt)}</span>
+              </div>
             </div>
           </div>
 
@@ -148,11 +168,11 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           <div className="bg-white rounded-xl border border-eco-100 p-5">
             <div className="flex items-center gap-2 mb-4">
               <User className="w-4 h-4 text-eco-700" />
-              <h2 className="font-semibold text-sm text-slate-900">Customer</h2>
+              <h2 className="font-semibold text-sm text-slate-900">Customer Details</h2>
             </div>
             <div className="space-y-1 text-sm">
-              <p className="font-semibold text-slate-900">{order.shippingName}</p>
-              <p className="text-slate-500">{order.shippingPhone}</p>
+              <p className="font-semibold text-slate-900">{order.shipping_name || order.shippingName}</p>
+              <p className="text-slate-500">{order.shipping_phone || order.shippingPhone}</p>
               {order.user?.email && <p className="text-slate-400 text-xs">{order.user.email}</p>}
             </div>
           </div>
@@ -164,17 +184,17 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               <h2 className="font-semibold text-sm text-slate-900">Shipping Address</h2>
             </div>
             <div className="text-sm text-slate-600 space-y-0.5">
-              <p>{order.shippingAddress}</p>
-              <p>{order.shippingCity}{order.shippingState ? `, ${order.shippingState}` : ''}</p>
-              <p>{order.shippingPostalCode}</p>
+              <p>{order.shipping_address || order.shippingAddress}</p>
+              <p>{order.shipping_city || order.shippingCity}{order.shipping_state || order.shippingState ? `, ${order.shipping_state || order.shippingState}` : ''}</p>
+              <p>{order.shipping_postal_code || order.shippingPostalCode}</p>
             </div>
           </div>
 
           {/* Custom notes */}
-          {order.customizationNotes && (
+          {(order.customization_notes || order.customizationNotes) && (
             <div className="bg-jute-50 border border-jute-200 rounded-xl p-5">
               <p className="text-xs font-bold text-jute-800 mb-2">✏️ Customization Notes</p>
-              <p className="text-sm text-slate-700">{order.customizationNotes}</p>
+              <p className="text-sm text-slate-700">{order.customization_notes || order.customizationNotes}</p>
             </div>
           )}
         </div>
@@ -220,18 +240,21 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Method</span>
-                <span className="font-medium text-slate-900">{order.paymentMethod || 'Online'}</span>
+                <span className="font-medium text-slate-900 flex items-center gap-1">
+                  {isCod ? <Banknote className="w-3.5 h-3.5 text-emerald-600" /> : <CreditCard className="w-3.5 h-3.5 text-blue-600" />}
+                  {isCod ? 'Cash on Delivery' : 'Razorpay Online'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Status</span>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                  order.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
-                  order.paymentStatus === 'FAILED' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
-                }`}>{order.paymentStatus}</span>
+                  payStat === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
+                  payStat === 'FAILED' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
+                }`}>{payStat}</span>
               </div>
               <div className="flex justify-between border-t border-eco-50 pt-2 mt-2">
                 <span className="font-semibold text-slate-700">Total</span>
-                <span className="font-bold text-slate-900">{formatPrice(order.totalAmount)}</span>
+                <span className="font-bold text-slate-900">{formatPrice(totalAmt)}</span>
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { getAuthFromRequest } from '@/lib/auth';
-import { createPaymentOrder } from '@/lib/razorpay';
+import { createPaymentOrder, isRazorpayConfigured } from '@/lib/razorpay';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -54,13 +54,20 @@ export async function POST(req: NextRequest) {
       shippingCity,
       shippingState,
       shippingPostalCode,
-      paymentMethod = 'RAZORPAY',
+      paymentMethod = 'COD',
       customizationNotes,
       customFileUrl,
     } = await req.json();
 
     if (!shippingName || !shippingPhone || !shippingAddress || !shippingCity || !shippingPostalCode) {
       return NextResponse.json({ error: 'Complete shipping address is required' }, { status: 400 });
+    }
+
+    // If customer selected Razorpay, verify gateway is configured
+    if (paymentMethod === 'RAZORPAY' && !isRazorpayConfigured()) {
+      return NextResponse.json({
+        error: 'Online payment is temporarily unavailable. Please choose Cash on Delivery or try again later.',
+      }, { status: 400 });
     }
 
     // Fetch user's cart items
@@ -75,77 +82,124 @@ export async function POST(req: NextRequest) {
     let subtotal = 0;
     const orderItemsData: any[] = [];
 
+    // Server-side authoritative price retrieval & stock validation
     for (const item of cartItems) {
       const prod = item.product;
-      const price = parseFloat(prod.discount_price ?? prod.price);
-
-      if (prod.stock_quantity < item.quantity) {
+      if (!prod || prod.product_status === 'DISCONTINUED') {
         return NextResponse.json({
-          error: `Insufficient stock for product: ${prod.name}. Available: ${prod.stock_quantity}`,
+          error: `Product "${prod?.name || 'Item'}" is currently unavailable.`,
         }, { status: 400 });
       }
 
-      subtotal += price * item.quantity;
+      if (prod.stock_quantity < item.quantity) {
+        return NextResponse.json({
+          error: `Insufficient stock for "${prod.name}". Available quantity: ${prod.stock_quantity}`,
+        }, { status: 400 });
+      }
+
+      const unitPrice = parseFloat(prod.discount_price ?? prod.price);
+      subtotal += unitPrice * item.quantity;
+
       orderItemsData.push({
         product_id: prod.id,
         product_name: prod.name,
         product_sku: prod.sku,
-        price,
+        price: unitPrice,
         quantity: item.quantity,
-        customization_notes: item.customization_notes,
+        customization_notes: item.customization_notes || null,
       });
     }
 
-    const shippingFee = subtotal > 1000 ? 0 : 50;
+    const shippingFee = subtotal >= 1000 ? 0 : 50;
     const totalAmount = subtotal + shippingFee;
-    const orderNumber = `UJW-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const orderNumber = `UJW-${timestamp}-${randomSuffix}`;
 
+    const isCod = paymentMethod === 'COD';
+    const initialOrderStatus = isCod ? 'CONFIRMED' : 'PENDING';
+    const initialPaymentStatus = 'PENDING';
+
+    // 1. Create internal order in Supabase
     const { data: order, error: orderErr } = await db.from('orders').insert({
       order_number: orderNumber,
       user_id: session.userId,
-      shipping_name: shippingName,
-      shipping_phone: shippingPhone,
-      shipping_address: shippingAddress,
-      shipping_city: shippingCity,
-      shipping_state: shippingState || 'Andhra Pradesh',
-      shipping_postal_code: shippingPostalCode,
+      shipping_name: shippingName.trim(),
+      shipping_phone: shippingPhone.trim(),
+      shipping_address: shippingAddress.trim(),
+      shipping_city: shippingCity.trim(),
+      shipping_state: shippingState?.trim() || 'Andhra Pradesh',
+      shipping_postal_code: shippingPostalCode.trim(),
       subtotal,
       shipping_fee: shippingFee,
       total_amount: totalAmount,
-      order_status: 'PENDING',
-      payment_status: 'PENDING',
+      order_status: initialOrderStatus,
+      payment_status: initialPaymentStatus,
       payment_method: paymentMethod,
-      customization_notes: customizationNotes,
-      custom_file_url: customFileUrl,
+      customization_notes: customizationNotes || null,
+      custom_file_url: customFileUrl || null,
     }).select().single();
 
-    if (orderErr) throw orderErr;
+    if (orderErr || !order) {
+      console.error('Order insertion error:', orderErr);
+      throw new Error('Failed to create order record in database.');
+    }
 
-    // Insert order items
+    // 2. Insert order items
     const itemsToInsert = orderItemsData.map((item) => ({
       ...item,
       order_id: order.id,
     }));
-    await db.from('order_items').insert(itemsToInsert);
+    const { error: itemsErr } = await db.from('order_items').insert(itemsToInsert);
+    if (itemsErr) {
+      console.error('Order items insertion error:', itemsErr);
+      throw new Error('Failed to save order items.');
+    }
 
-    // Create Razorpay payment order
+    // 3. Handle payment method specific processing
     let razorpayOrder = null;
-    if (paymentMethod === 'RAZORPAY') {
-      razorpayOrder = await createPaymentOrder({
-        amount: totalAmount,
-        receipt: order.order_number,
-        notes: { orderId: order.id, customerName: shippingName },
-      });
 
+    if (paymentMethod === 'RAZORPAY') {
+      try {
+        razorpayOrder = await createPaymentOrder({
+          amount: totalAmount,
+          receipt: order.order_number,
+          notes: { orderId: order.id, customerName: shippingName },
+        });
+
+        await db.from('payments').insert({
+          order_id: order.id,
+          razorpay_order_id: razorpayOrder.id,
+          amount: totalAmount,
+          status: 'PENDING',
+        });
+      } catch (rzpErr: any) {
+        console.error('Razorpay order creation error:', rzpErr);
+        // Rollback order if razorpay creation fails
+        await db.from('orders').delete().eq('id', order.id);
+        return NextResponse.json({
+          error: rzpErr.message || 'Failed to initialize payment gateway. Please try again or choose COD.',
+        }, { status: 400 });
+      }
+    } else {
+      // For COD: create pending payment record
       await db.from('payments').insert({
         order_id: order.id,
-        razorpay_order_id: razorpayOrder.id,
         amount: totalAmount,
         status: 'PENDING',
       });
+
+      // Deduct stock for COD confirmed order
+      for (const item of itemsToInsert) {
+        const { data: prod } = await db.from('products').select('stock_quantity').eq('id', item.product_id).single();
+        if (prod) {
+          const newStock = Math.max(0, prod.stock_quantity - item.quantity);
+          await db.from('products').update({ stock_quantity: newStock }).eq('id', item.product_id);
+        }
+      }
     }
 
-    // Clear user cart after order placement
+    // 4. Clear user's cart
     await db.from('cart_items').delete().eq('user_id', session.userId);
 
     return NextResponse.json({
@@ -154,6 +208,7 @@ export async function POST(req: NextRequest) {
         items: itemsToInsert,
       },
       razorpayOrder,
+      isCod,
     }, { status: 201 });
   } catch (error: any) {
     console.error('Create order error:', error);

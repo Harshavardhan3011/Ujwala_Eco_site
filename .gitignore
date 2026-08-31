@@ -48,3 +48,4 @@ scripts/test-live-login.js
 scripts/test-login-debug.js
 scripts/test-rls.js
 scripts/test-superadmin-security.js
+scripts/test-order-payment-system.js
