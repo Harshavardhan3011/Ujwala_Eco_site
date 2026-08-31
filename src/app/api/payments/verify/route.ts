@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { executePrivilegedQuery, executePrivilegedQueryOne, adminGetOrderById } from '@/lib/serverDb';
 import { verifyPaymentSignature, isRazorpayConfigured } from '@/lib/razorpay';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -25,26 +25,21 @@ export async function POST(req: NextRequest) {
 
     if (!isSignatureValid) {
       console.warn(`Payment signature verification failed for order ${orderId}`);
-      await db.from('payments').update({
-        status: 'FAILED',
-        updated_at: new Date().toISOString(),
-      }).eq('order_id', orderId);
-
-      await db.from('orders').update({
-        payment_status: 'FAILED',
-        updated_at: new Date().toISOString(),
-      }).eq('id', orderId);
+      await executePrivilegedQuery(
+        `UPDATE public.payments SET status = 'FAILED', updated_at = NOW() WHERE order_id = $1;`,
+        [orderId]
+      );
+      await executePrivilegedQuery(
+        `UPDATE public.orders SET payment_status = 'FAILED', updated_at = NOW() WHERE id = $1;`,
+        [orderId]
+      );
 
       return NextResponse.json({ error: 'Payment signature verification failed' }, { status: 400 });
     }
 
     // Fetch existing order to check idempotency
-    const { data: existingOrder, error: fetchErr } = await db.from('orders')
-      .select('*, items:order_items(*)')
-      .eq('id', orderId)
-      .single();
-
-    if (fetchErr || !existingOrder) {
+    const existingOrder = await adminGetOrderById(orderId);
+    if (!existingOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
@@ -52,36 +47,40 @@ export async function POST(req: NextRequest) {
     const isAlreadyPaid = existingOrder.payment_status === 'PAID';
 
     // Update payment record
-    await db.from('payments').update({
-      razorpay_payment_id: razorpay_payment_id,
-      razorpay_signature: razorpay_signature,
-      status: 'SUCCESS',
-      updated_at: new Date().toISOString(),
-    }).eq('order_id', orderId);
+    await executePrivilegedQuery(`
+      UPDATE public.payments
+      SET razorpay_payment_id = $1,
+          razorpay_signature = $2,
+          status = 'SUCCESS',
+          updated_at = NOW()
+      WHERE order_id = $3;
+    `, [razorpay_payment_id, razorpay_signature, orderId]);
 
     // Update order status
-    const { data: updatedOrder, error: orderErr } = await db.from('orders').update({
-      payment_status: 'PAID',
-      order_status: 'CONFIRMED',
-      updated_at: new Date().toISOString(),
-    }).eq('id', orderId).select('*, items:order_items(*)').single();
+    await executePrivilegedQuery(`
+      UPDATE public.orders
+      SET payment_status = 'PAID',
+          order_status = 'CONFIRMED',
+          updated_at = NOW()
+      WHERE id = $1;
+    `, [orderId]);
 
-    if (orderErr) throw orderErr;
+    const updatedOrder = await adminGetOrderById(orderId);
 
     // Idempotent inventory deduction: only deduct if not already paid
     if (!isAlreadyPaid && updatedOrder.items) {
       for (const item of updatedOrder.items) {
-        const { data: prod } = await db.from('products').select('stock_quantity').eq('id', item.product_id).single();
-        if (prod) {
-          const newStock = Math.max(0, prod.stock_quantity - item.quantity);
-          await db.from('products').update({ stock_quantity: newStock }).eq('id', item.product_id);
-        }
+        await executePrivilegedQuery(`
+          UPDATE public.products
+          SET stock_quantity = GREATEST(0, stock_quantity - $1)
+          WHERE id = $2;
+        `, [item.quantity, item.product_id]);
       }
     }
 
     // Clear user cart
     if (updatedOrder.user_id) {
-      await db.from('cart_items').delete().eq('user_id', updatedOrder.user_id);
+      await executePrivilegedQuery('DELETE FROM public.cart_items WHERE user_id = $1;', [updatedOrder.user_id]);
     }
 
     return NextResponse.json({

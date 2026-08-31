@@ -49,3 +49,7 @@ scripts/test-login-debug.js
 scripts/test-rls.js
 scripts/test-superadmin-security.js
 scripts/test-order-payment-system.js
+scripts/diagnose-db-privileges.js
+scripts/test-pg-pool.js
+scripts/test-admin-crud-permissions.js
+scripts/test-connection.js

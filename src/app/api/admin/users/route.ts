@@ -1,6 +1,10 @@
-import { db } from '@/lib/db';
 import { verifySuperAdminFromRequest } from '@/lib/auth';
-import { upsertAdminProfilePrivileged, cleanupAuthUserPrivileged } from '@/lib/serverDb';
+import {
+  getAdminUsersPrivileged,
+  createAdminAuthUserPrivileged,
+  upsertAdminProfilePrivileged,
+  cleanupAuthUserPrivileged,
+} from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -11,21 +15,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden: Superadmin access required' }, { status: 403 });
   }
 
-  try {
-    const { data: users, error } = await db
-      .from('profiles')
-      .select('id, name, email, phone, role, created_at, updated_at')
-      .in('role', ['admin', 'superadmin', 'ADMIN', 'SUPERADMIN'])
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return NextResponse.json({ error: 'Failed to fetch admin users' }, { status: 500 });
-    }
-
-    return NextResponse.json({ users: users || [] });
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Failed to fetch admin users' }, { status: 500 });
+  const result = await getAdminUsersPrivileged();
+  if (!result.success || !result.users) {
+    return NextResponse.json({ error: result.error || 'Failed to fetch admin users' }, { status: 500 });
   }
+
+  return NextResponse.json({ users: result.users });
 }
 
 export async function POST(req: NextRequest) {
@@ -48,27 +43,24 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    const { data: authData, error: authError } = await db.auth.signUp({
+    // 1. Privileged server-side Auth user creation
+    const authRes = await createAdminAuthUserPrivileged({
       email: cleanEmail,
       password,
-      options: {
-        data: {
-          name,
-          phone: phone || null,
-          role: 'admin',
-        },
-      },
+      name,
+      phone: phone || null,
     });
 
-    if (authError || !authData.user) {
-      const errMsg = authError?.message?.includes('already registered')
-        ? 'An account with this email already exists'
-        : 'Unable to create administrator authentication account';
-      return NextResponse.json({ error: errMsg }, { status: 400 });
+    if (!authRes.success || !authRes.userId) {
+      return NextResponse.json(
+        { error: authRes.error || 'Unable to create administrator authentication account' },
+        { status: 400 }
+      );
     }
 
-    const newUserId = authData.user.id;
+    const newUserId = authRes.userId;
 
+    // 2. Privileged server-side upsert on public.profiles to set role = 'admin'
     const profileRes = await upsertAdminProfilePrivileged({
       id: newUserId,
       name,
@@ -95,7 +87,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[ADMIN_CREATE] Unexpected exception:', error?.message);
     return NextResponse.json(
-      { error: 'Unable to create administrator. Please try again.' },
+      { error: error?.message || 'Unable to create administrator. Please try again.' },
       { status: 500 }
     );
   }

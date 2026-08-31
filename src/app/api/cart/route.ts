@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { getAuthFromRequest } from '@/lib/auth';
+import { executePrivilegedQuery, executePrivilegedQueryOne } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -13,25 +13,27 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ items: [], subtotal: 0, shippingFee: 0, totalAmount: 0 });
     }
 
-    let query = db.from('cart_items').select(`
-      *,
-      product:products(
-        id, name, sku, slug, price, discount_price, min_order_quantity, stock_quantity,
-        images:product_images(*)
-      )
-    `);
-
+    let cartItems: any[] = [];
     if (session) {
-      query = query.eq('user_id', session.userId);
+      cartItems = await executePrivilegedQuery(`
+        SELECT 
+          ci.*,
+          row_to_json(p.*) as product,
+          COALESCE((SELECT json_agg(pi.*) FROM public.product_images pi WHERE pi.product_id = p.id), '[]'::json) as images
+        FROM public.cart_items ci
+        JOIN public.products p ON p.id = ci.product_id
+        WHERE ci.user_id = $1;
+      `, [session.userId]);
     } else if (sessionId) {
-      query = query.eq('session_id', sessionId);
-    }
-
-    const { data: cartItems, error } = await query;
-
-    if (error) {
-      console.error('Cart fetch Supabase error:', error);
-      throw error;
+      cartItems = await executePrivilegedQuery(`
+        SELECT 
+          ci.*,
+          row_to_json(p.*) as product,
+          COALESCE((SELECT json_agg(pi.*) FROM public.product_images pi WHERE pi.product_id = p.id), '[]'::json) as images
+        FROM public.cart_items ci
+        JOIN public.products p ON p.id = ci.product_id
+        WHERE ci.session_id = $1;
+      `, [sessionId]);
     }
 
     let subtotal = 0;
@@ -45,7 +47,8 @@ export async function GET(req: NextRequest) {
         const itemTotal = unitPrice * item.quantity;
         subtotal += itemTotal;
 
-        const primaryImg = (prod.images || []).find((i: any) => i.is_primary) || prod.images?.[0];
+        const images = item.images || [];
+        const primaryImg = images.find((i: any) => i.is_primary) || images[0];
         const image = primaryImg ? primaryImg.image_url : '/bags/b1.jpeg';
 
         return {
@@ -89,8 +92,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid product or quantity' }, { status: 400 });
     }
 
-    const { data: product, error: prodErr } = await db.from('products').select('*').eq('id', productId).single();
-    if (prodErr || !product) {
+    const product = await executePrivilegedQueryOne(
+      'SELECT * FROM public.products WHERE id = $1;',
+      [productId]
+    );
+
+    if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
@@ -110,35 +117,28 @@ export async function POST(req: NextRequest) {
     const activeSessionId = session ? null : (sessionId || 'guest-session');
 
     // Check if item already in cart
-    let checkQuery = db.from('cart_items').select('*').eq('product_id', productId);
-    if (session) {
-      checkQuery = checkQuery.eq('user_id', userId);
-    } else {
-      checkQuery = checkQuery.eq('session_id', activeSessionId);
-    }
-
-    const { data: existingItems } = await checkQuery;
-    const existingItem = existingItems && existingItems.length > 0 ? existingItems[0] : null;
+    const existingItem = userId
+      ? await executePrivilegedQueryOne('SELECT * FROM public.cart_items WHERE product_id = $1 AND user_id = $2;', [productId, userId])
+      : await executePrivilegedQueryOne('SELECT * FROM public.cart_items WHERE product_id = $1 AND session_id = $2;', [productId, activeSessionId]);
 
     if (existingItem) {
-      const { data: updated, error: updateErr } = await db.from('cart_items').update({
-        quantity: quantity,
-        customization_notes: customizationNotes ?? existingItem.customization_notes,
-        updated_at: new Date().toISOString(),
-      }).eq('id', existingItem.id).select().single();
+      const updated = await executePrivilegedQueryOne(`
+        UPDATE public.cart_items
+        SET quantity = $1,
+            customization_notes = COALESCE($2, customization_notes),
+            updated_at = NOW()
+        WHERE id = $3
+        RETURNING *;
+      `, [quantity, customizationNotes || null, existingItem.id]);
 
-      if (updateErr) throw updateErr;
       return NextResponse.json({ item: updated });
     } else {
-      const { data: newItem, error: createErr } = await db.from('cart_items').insert({
-        user_id: userId,
-        session_id: activeSessionId,
-        product_id: productId,
-        quantity,
-        customization_notes: customizationNotes,
-      }).select().single();
+      const newItem = await executePrivilegedQueryOne(`
+        INSERT INTO public.cart_items (user_id, session_id, product_id, quantity, customization_notes)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *;
+      `, [userId, activeSessionId, productId, quantity, customizationNotes || null]);
 
-      if (createErr) throw createErr;
       return NextResponse.json({ item: newItem }, { status: 201 });
     }
   } catch (error: any) {
@@ -154,10 +154,10 @@ export async function DELETE(req: NextRequest) {
     const session = getAuthFromRequest(req);
 
     if (itemId) {
-      await db.from('cart_items').delete().eq('id', itemId);
+      await executePrivilegedQuery('DELETE FROM public.cart_items WHERE id = $1;', [itemId]);
       return NextResponse.json({ message: 'Item removed from cart' });
     } else if (session) {
-      await db.from('cart_items').delete().eq('user_id', session.userId);
+      await executePrivilegedQuery('DELETE FROM public.cart_items WHERE user_id = $1;', [session.userId]);
       return NextResponse.json({ message: 'Cart cleared' });
     }
 

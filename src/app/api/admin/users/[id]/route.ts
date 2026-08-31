@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { verifySuperAdminFromRequest } from '@/lib/auth';
+import { executePrivilegedQuery, executePrivilegedQueryOne, deleteAdminUserPrivileged } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -11,13 +11,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const { id } = params;
-  const { data: user, error } = await db
-    .from('profiles')
-    .select('id, name, email, phone, role, created_at, updated_at')
-    .eq('id', id)
-    .single();
+  const user = await executePrivilegedQueryOne(
+    'SELECT id, name, email, phone, role, created_at, updated_at FROM public.profiles WHERE id = $1;',
+    [id]
+  );
 
-  if (error || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
@@ -36,24 +35,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const { name, phone, role } = body;
 
     // Fetch existing target profile
-    const { data: targetUser, error: fetchErr } = await db
-      .from('profiles')
-      .select('id, role, email')
-      .eq('id', id)
-      .single();
+    const targetUser = await executePrivilegedQueryOne(
+      'SELECT id, role, email FROM public.profiles WHERE id = $1;',
+      [id]
+    );
 
-    if (fetchErr || !targetUser) {
+    if (!targetUser) {
       return NextResponse.json({ error: 'Target user not found' }, { status: 404 });
     }
 
     // Superadmin Protection: If attempting to change role away from superadmin
     if (targetUser.role?.toLowerCase() === 'superadmin' && role && role.toLowerCase() !== 'superadmin') {
-      const { count } = await db
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .in('role', ['superadmin', 'SUPERADMIN']);
+      const superadminCountRes = await executePrivilegedQueryOne(
+        "SELECT COUNT(*)::int as count FROM public.profiles WHERE LOWER(role) = 'superadmin';"
+      );
 
-      if ((count || 0) <= 1) {
+      if ((superadminCountRes?.count || 0) <= 1) {
         return NextResponse.json(
           { error: 'Action blocked: Cannot demote or alter the role of the final superadmin account.' },
           { status: 400 }
@@ -61,27 +58,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    const updatePayload: any = {};
-    if (name !== undefined) updatePayload.name = name;
-    if (phone !== undefined) updatePayload.phone = phone;
+    const clauses: string[] = [];
+    const paramsList: any[] = [];
+    let idx = 1;
+
+    if (name !== undefined) { clauses.push(`name = $${idx++}`); paramsList.push(name); }
+    if (phone !== undefined) { clauses.push(`phone = $${idx++}`); paramsList.push(phone); }
     if (role !== undefined) {
-      // Only allow assigning 'admin' or 'customer' via UI management
       const normalizedRole = role.toLowerCase();
       if (!['admin', 'superadmin', 'customer'].includes(normalizedRole)) {
         return NextResponse.json({ error: 'Invalid role specified' }, { status: 400 });
       }
-      updatePayload.role = normalizedRole;
+      clauses.push(`role = $${idx++}`);
+      paramsList.push(normalizedRole);
     }
-    updatePayload.updated_at = new Date().toISOString();
+    clauses.push(`updated_at = NOW()`);
+    paramsList.push(id);
 
-    const { data: updatedUser, error: updateErr } = await db
-      .from('profiles')
-      .update(updatePayload)
-      .eq('id', id)
-      .select('id, name, email, phone, role, created_at, updated_at')
-      .single();
-
-    if (updateErr) throw updateErr;
+    const updatedUser = await executePrivilegedQueryOne(
+      `UPDATE public.profiles SET ${clauses.join(', ')} WHERE id = $${idx} RETURNING id, name, email, phone, role, created_at, updated_at;`,
+      paramsList
+    );
 
     return NextResponse.json({ user: updatedUser });
   } catch (error: any) {
@@ -100,24 +97,22 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const { id } = params;
 
     // Fetch target user
-    const { data: targetUser, error: fetchErr } = await db
-      .from('profiles')
-      .select('id, role')
-      .eq('id', id)
-      .single();
+    const targetUser = await executePrivilegedQueryOne(
+      'SELECT id, role FROM public.profiles WHERE id = $1;',
+      [id]
+    );
 
-    if (fetchErr || !targetUser) {
+    if (!targetUser) {
       return NextResponse.json({ error: 'Target user not found' }, { status: 404 });
     }
 
     // Superadmin Protection: Cannot delete the last superadmin
     if (targetUser.role?.toLowerCase() === 'superadmin') {
-      const { count } = await db
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .in('role', ['superadmin', 'SUPERADMIN']);
+      const countRes = await executePrivilegedQueryOne(
+        "SELECT COUNT(*)::int as count FROM public.profiles WHERE LOWER(role) = 'superadmin';"
+      );
 
-      if ((count || 0) <= 1) {
+      if ((countRes?.count || 0) <= 1) {
         return NextResponse.json(
           { error: 'Action blocked: Cannot delete the final superadmin account.' },
           { status: 400 }
@@ -125,8 +120,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       }
     }
 
-    const { error: deleteErr } = await db.from('profiles').delete().eq('id', id);
-    if (deleteErr) throw deleteErr;
+    const delRes = await deleteAdminUserPrivileged(id);
+    if (!delRes.success) {
+      return NextResponse.json({ error: delRes.error || 'Failed to delete administrator user' }, { status: 500 });
+    }
 
     return NextResponse.json({ message: 'User deleted successfully' });
   } catch (error: any) {

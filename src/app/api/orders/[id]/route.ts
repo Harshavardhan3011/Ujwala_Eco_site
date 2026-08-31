@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { getAuthFromRequest, verifyAdminFromRequest } from '@/lib/auth';
+import { adminGetOrderById, adminUpdateOrder } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -12,27 +12,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const { id } = params;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const order = await adminGetOrderById(id);
 
-    let query = db.from('orders').select(`
-      *,
-      items:order_items(*),
-      payment:payments(*),
-      user:profiles(name, email, phone)
-    `);
-
-    if (isUuid) {
-      query = query.or(`id.eq.${id},order_number.eq.${id}`);
-    } else {
-      query = query.eq('order_number', id);
-    }
-
-    const { data: orders, error } = await query;
-    if (error || !orders || orders.length === 0) {
+    if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
-
-    const order = orders[0];
 
     // Authorization check
     if (!['admin', 'superadmin'].includes(session.role?.toLowerCase()) && order.user_id !== session.userId) {
@@ -56,22 +40,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const { id } = params;
     const { orderStatus, paymentStatus } = await req.json();
 
-    const updatePayload: any = {};
-    if (orderStatus) updatePayload.order_status = orderStatus;
-    if (paymentStatus) updatePayload.payment_status = paymentStatus;
-    updatePayload.updated_at = new Date().toISOString();
-
-    const { data: order, error } = await db.from('orders')
-      .update(updatePayload)
-      .eq('id', id)
-      .select('*, items:order_items(*), payment:payments(*)')
-      .single();
-
-    if (error) throw error;
+    const order = await adminUpdateOrder(id, { orderStatus, paymentStatus });
 
     return NextResponse.json({ order });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update order status error:', error);
-    return NextResponse.json({ error: 'Failed to update order status' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to update order status' }, { status: 500 });
   }
 }

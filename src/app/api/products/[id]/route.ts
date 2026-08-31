@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
-import { getAuthFromRequest, verifyAdminFromRequest } from '@/lib/auth';
+import { verifyAdminFromRequest } from '@/lib/auth';
+import { adminUpdateProduct, adminDeleteProduct } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -134,49 +135,30 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       isBestseller, tags, seoTitle, seoDescription, images,
     } = data;
 
-    const updatePayload: any = {};
-    if (name !== undefined) updatePayload.name = name;
-    if (slug !== undefined) updatePayload.slug = slug;
-    if (sku !== undefined) updatePayload.sku = sku;
-    if (description !== undefined) updatePayload.description = description;
-    if (shortDescription !== undefined) updatePayload.short_description = shortDescription;
-    if (categoryId !== undefined) updatePayload.category_id = categoryId;
-    if (price !== undefined) updatePayload.price = parseFloat(price);
-    if (discountPrice !== undefined) updatePayload.discount_price = discountPrice ? parseFloat(discountPrice) : null;
-    if (stockQuantity !== undefined) updatePayload.stock_quantity = parseInt(stockQuantity);
-    if (minOrderQuantity !== undefined) updatePayload.min_order_quantity = parseInt(minOrderQuantity);
-    if (material !== undefined) updatePayload.material = material;
-    if (dimensions !== undefined) updatePayload.dimensions = dimensions;
-    if (weight !== undefined) updatePayload.weight = weight;
-    if (isCustomizable !== undefined) updatePayload.is_customizable = Boolean(isCustomizable);
-    if (customizationDetails !== undefined) updatePayload.customization_details = customizationDetails;
-    if (productStatus !== undefined) updatePayload.product_status = productStatus;
-    if (isFeatured !== undefined) updatePayload.is_featured = Boolean(isFeatured);
-    if (isBestseller !== undefined) updatePayload.is_bestseller = Boolean(isBestseller);
-    if (tags !== undefined) updatePayload.tags = tags;
-    if (seoTitle !== undefined) updatePayload.seo_title = seoTitle;
-    if (seoDescription !== undefined) updatePayload.seo_description = seoDescription;
-    updatePayload.updated_at = new Date().toISOString();
+    const payload: any = {};
+    if (name !== undefined) payload.name = name;
+    if (slug !== undefined) payload.slug = slug;
+    if (sku !== undefined) payload.sku = sku;
+    if (description !== undefined) payload.description = description;
+    if (shortDescription !== undefined) payload.short_description = shortDescription;
+    if (categoryId !== undefined) payload.category_id = categoryId;
+    if (price !== undefined) payload.price = parseFloat(price);
+    if (discountPrice !== undefined) payload.discount_price = discountPrice ? parseFloat(discountPrice) : null;
+    if (stockQuantity !== undefined) payload.stock_quantity = parseInt(stockQuantity);
+    if (minOrderQuantity !== undefined) payload.min_order_quantity = parseInt(minOrderQuantity);
+    if (material !== undefined) payload.material = material;
+    if (dimensions !== undefined) payload.dimensions = dimensions;
+    if (weight !== undefined) payload.weight = weight;
+    if (isCustomizable !== undefined) payload.is_customizable = Boolean(isCustomizable);
+    if (customizationDetails !== undefined) payload.customization_details = customizationDetails;
+    if (productStatus !== undefined) payload.product_status = productStatus;
+    if (isFeatured !== undefined) payload.is_featured = Boolean(isFeatured);
+    if (isBestseller !== undefined) payload.is_bestseller = Boolean(isBestseller);
+    if (tags !== undefined) payload.tags = tags;
+    if (seoTitle !== undefined) payload.seo_title = seoTitle;
+    if (seoDescription !== undefined) payload.seo_description = seoDescription;
 
-    const { data: updatedProduct, error } = await db.from('products')
-      .update(updatePayload)
-      .eq('id', id)
-      .select('*, category:categories(*), images:product_images(*)')
-      .single();
-
-    if (error) throw error;
-
-    if (images && Array.isArray(images)) {
-      await db.from('product_images').delete().eq('product_id', id);
-      const imageRows = images.map((imgUrl: string, index: number) => ({
-        product_id: id,
-        image_url: imgUrl,
-        alt_text: `${name || updatedProduct.name} Image ${index + 1}`,
-        is_primary: index === 0,
-        display_order: index,
-      }));
-      await db.from('product_images').insert(imageRows);
-    }
+    const updatedProduct = await adminUpdateProduct(id, payload, images);
 
     return NextResponse.json({ product: updatedProduct });
   } catch (error: any) {
@@ -193,13 +175,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
 
     const { id } = params;
-    const { error } = await db.from('products').delete().eq('id', id);
-
-    if (error) throw error;
+    await adminDeleteProduct(id);
 
     return NextResponse.json({ message: 'Product deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Delete product error:', error);
-    return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to delete product' }, { status: 500 });
   }
 }

@@ -1,13 +1,12 @@
-import { db } from '@/lib/db';
 import { verifyAdminFromRequest } from '@/lib/auth';
+import { adminGetSiteSettings, adminUpsertSiteSetting } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const { data: settingsList, error } = await db.from('site_settings').select('*');
-    if (error) throw error;
+    const settingsList = await adminGetSiteSettings();
 
     const settings: Record<string, string> = {};
     (settingsList || []).forEach((s: any) => {
@@ -35,16 +34,12 @@ export async function PUT(req: NextRequest) {
     }
 
     for (const [key, value] of Object.entries(settings)) {
-      await db.from('site_settings').upsert({
-        key,
-        value: String(value),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'key' });
+      await adminUpsertSiteSetting(key, String(value));
     }
 
     return NextResponse.json({ message: 'Site settings updated successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update site settings error:', error);
-    return NextResponse.json({ error: 'Failed to update site settings' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to update site settings' }, { status: 500 });
   }
 }

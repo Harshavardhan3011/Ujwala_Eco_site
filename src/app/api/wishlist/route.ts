@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { getAuthFromRequest } from '@/lib/auth';
+import { customerGetWishlist, customerToggleWishlist } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -11,15 +11,32 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ wishlist: [] });
     }
 
-    const { data: items, error } = await db
-      .from('wishlist_items')
-      .select('*, product:products(*, category:categories(*), images:product_images(*))')
-      .eq('user_id', session.userId);
+    const items = await customerGetWishlist(session.userId);
 
-    if (error) throw error;
+    const formattedWishlist = (items || []).map((item: any) => ({
+      id: item.id,
+      userId: item.user_id,
+      productId: item.product_id,
+      createdAt: item.created_at,
+      product: item.product ? {
+        id: item.product.id,
+        name: item.product.name,
+        slug: item.product.slug,
+        sku: item.product.sku,
+        price: parseFloat(item.product.price),
+        discountPrice: item.product.discount_price ? parseFloat(item.product.discount_price) : null,
+        stockQuantity: item.product.stock_quantity,
+        productStatus: item.product.product_status,
+        images: (item.images || []).map((img: any) => ({
+          id: img.id,
+          imageUrl: img.image_url,
+          isPrimary: img.is_primary,
+        })),
+      } : null,
+    }));
 
-    return NextResponse.json({ wishlist: items || [] });
-  } catch (error) {
+    return NextResponse.json({ wishlist: formattedWishlist });
+  } catch (error: any) {
     console.error('Fetch wishlist error:', error);
     return NextResponse.json({ error: 'Failed to fetch wishlist' }, { status: 500 });
   }
@@ -37,23 +54,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product ID required' }, { status: 400 });
     }
 
-    const { data: existing } = await db
-      .from('wishlist_items')
-      .select('*')
-      .eq('user_id', session.userId)
-      .eq('product_id', productId)
-      .single();
-
-    if (existing) {
-      await db.from('wishlist_items').delete().eq('id', existing.id);
-      return NextResponse.json({ message: 'Removed from wishlist', inWishlist: false });
-    } else {
-      await db.from('wishlist_items').insert({
-        user_id: session.userId,
-        product_id: productId,
-      });
-      return NextResponse.json({ message: 'Added to wishlist', inWishlist: true }, { status: 201 });
-    }
+    const result = await customerToggleWishlist(session.userId, productId);
+    return NextResponse.json(result, { status: result.inWishlist ? 201 : 200 });
   } catch (error: any) {
     console.error('Wishlist POST error:', error);
     return NextResponse.json({ error: 'Failed to update wishlist' }, { status: 500 });

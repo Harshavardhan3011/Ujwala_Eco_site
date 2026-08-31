@@ -1,34 +1,25 @@
-import { db } from '@/lib/db';
-import { getAuthFromRequest, verifyAdminFromRequest } from '@/lib/auth';
+import { verifyAdminFromRequest } from '@/lib/auth';
+import { adminGetCategories, adminCreateCategory } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const { data: categories, error } = await db
-      .from('categories')
-      .select('*, products:products(id)')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true });
+    const categories = await adminGetCategories();
 
-    if (error) throw error;
-
-    const formattedCategories = (categories || []).map((cat: any) => {
-      const productCount = (cat.products || []).length;
-      return {
-        id: cat.id,
-        name: cat.name,
-        slug: cat.slug,
-        description: cat.description,
-        image: cat.image,
-        displayOrder: cat.display_order,
-        isActive: cat.is_active,
-        _count: {
-          products: productCount,
-        },
-      };
-    });
+    const formattedCategories = (categories || []).map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description,
+      image: cat.image,
+      displayOrder: cat.display_order,
+      isActive: cat.is_active,
+      _count: {
+        products: parseInt(cat.product_count || '0', 10),
+      },
+    }));
 
     return NextResponse.json({ categories: formattedCategories });
   } catch (error) {
@@ -52,15 +43,13 @@ export async function POST(req: NextRequest) {
 
     const generatedSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    const { data: category, error } = await db.from('categories').insert({
+    const category = await adminCreateCategory({
       name,
       slug: generatedSlug,
-      description,
-      image,
+      description: description || null,
+      image: image || null,
       display_order: displayOrder ? parseInt(displayOrder) : 0,
-    }).select().single();
-
-    if (error) throw error;
+    });
 
     return NextResponse.json({ category }, { status: 201 });
   } catch (error: any) {

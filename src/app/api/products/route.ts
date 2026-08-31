@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { getAuthFromRequest, verifyAdminFromRequest } from '@/lib/auth';
+import { adminCreateProduct } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -196,7 +197,7 @@ export async function POST(req: NextRequest) {
 
     const generatedSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    const { data: product, error } = await db.from('products').insert({
+    const productPayload = {
       name,
       slug: generatedSlug,
       sku,
@@ -212,26 +213,15 @@ export async function POST(req: NextRequest) {
       weight,
       is_customizable: Boolean(isCustomizable),
       customization_details: customizationDetails,
+      product_status: 'IN_STOCK',
       is_featured: Boolean(isFeatured),
       is_bestseller: Boolean(isBestseller),
       tags,
       seo_title: seoTitle,
       seo_description: seoDescription,
-    }).select().single();
+    };
 
-    if (error) throw error;
-
-    if (images && Array.isArray(images) && images.length > 0) {
-      const imageRows = images.map((imgUrl: string, idx: number) => ({
-        product_id: product.id,
-        image_url: imgUrl,
-        alt_text: `${name} Image ${idx + 1}`,
-        is_primary: idx === 0,
-        display_order: idx,
-      }));
-
-      await db.from('product_images').insert(imageRows);
-    }
+    const product = await adminCreateProduct(productPayload, images);
 
     return NextResponse.json({ product }, { status: 201 });
   } catch (error: any) {

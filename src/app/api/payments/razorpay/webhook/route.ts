@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { executePrivilegedQuery, executePrivilegedQueryOne } from '@/lib/serverDb';
 import { verifyWebhookSignature } from '@/lib/razorpay';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -40,12 +40,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Find internal payment record by razorpay_order_id
-    const { data: paymentRecord, error: pErr } = await db.from('payments')
-      .select('*, order:orders(*, items:order_items(*))')
-      .eq('razorpay_order_id', razorpayOrderId)
-      .maybeSingle();
+    const paymentRecord = await executePrivilegedQueryOne(`
+      SELECT 
+        p.*,
+        row_to_json(o.*) as order,
+        COALESCE((SELECT json_agg(oi.*) FROM public.order_items oi WHERE oi.order_id = p.order_id), '[]'::json) as items
+      FROM public.payments p
+      JOIN public.orders o ON o.id = p.order_id
+      WHERE p.razorpay_order_id = $1
+      LIMIT 1;
+    `, [razorpayOrderId]);
 
-    if (pErr || !paymentRecord || !paymentRecord.order) {
+    if (!paymentRecord || !paymentRecord.order) {
       console.warn(`Webhook received for unknown Razorpay order: ${razorpayOrderId}`);
       return NextResponse.json({ message: 'Order not found in system' }, { status: 200 });
     }
@@ -56,46 +62,54 @@ export async function POST(req: NextRequest) {
     // Handle events idempotently
     if (event === 'payment.captured' || event === 'order.paid') {
       // 1. Update payment record
-      await db.from('payments').update({
-        razorpay_payment_id: razorpayPaymentId || paymentRecord.razorpay_payment_id,
-        status: 'SUCCESS',
-        updated_at: new Date().toISOString(),
-      }).eq('id', paymentRecord.id);
+      await executePrivilegedQuery(`
+        UPDATE public.payments
+        SET razorpay_payment_id = COALESCE($1, razorpay_payment_id),
+            status = 'SUCCESS',
+            updated_at = NOW()
+        WHERE id = $2;
+      `, [razorpayPaymentId || null, paymentRecord.id]);
 
       // 2. Update order
-      await db.from('orders').update({
-        payment_status: 'PAID',
-        order_status: 'CONFIRMED',
-        updated_at: new Date().toISOString(),
-      }).eq('id', order.id);
+      await executePrivilegedQuery(`
+        UPDATE public.orders
+        SET payment_status = 'PAID',
+            order_status = 'CONFIRMED',
+            updated_at = NOW()
+        WHERE id = $1;
+      `, [order.id]);
 
       // 3. Idempotently deduct stock if not already processed
-      if (!isAlreadyPaid && order.items) {
-        for (const item of order.items) {
-          const { data: prod } = await db.from('products').select('stock_quantity').eq('id', item.product_id).single();
-          if (prod) {
-            const newStock = Math.max(0, prod.stock_quantity - item.quantity);
-            await db.from('products').update({ stock_quantity: newStock }).eq('id', item.product_id);
-          }
+      if (!isAlreadyPaid && paymentRecord.items) {
+        for (const item of paymentRecord.items) {
+          await executePrivilegedQuery(`
+            UPDATE public.products
+            SET stock_quantity = GREATEST(0, stock_quantity - $1)
+            WHERE id = $2;
+          `, [item.quantity, item.product_id]);
         }
       }
 
       // 4. Clear customer's cart
       if (order.user_id) {
-        await db.from('cart_items').delete().eq('user_id', order.user_id);
+        await executePrivilegedQuery('DELETE FROM public.cart_items WHERE user_id = $1;', [order.user_id]);
       }
     } else if (event === 'payment.failed') {
-      await db.from('payments').update({
-        razorpay_payment_id: razorpayPaymentId || paymentRecord.razorpay_payment_id,
-        status: 'FAILED',
-        updated_at: new Date().toISOString(),
-      }).eq('id', paymentRecord.id);
+      await executePrivilegedQuery(`
+        UPDATE public.payments
+        SET razorpay_payment_id = COALESCE($1, razorpay_payment_id),
+            status = 'FAILED',
+            updated_at = NOW()
+        WHERE id = $2;
+      `, [razorpayPaymentId || null, paymentRecord.id]);
 
       if (!isAlreadyPaid) {
-        await db.from('orders').update({
-          payment_status: 'FAILED',
-          updated_at: new Date().toISOString(),
-        }).eq('id', order.id);
+        await executePrivilegedQuery(`
+          UPDATE public.orders
+          SET payment_status = 'FAILED',
+              updated_at = NOW()
+          WHERE id = $1;
+        `, [order.id]);
       }
     }
 

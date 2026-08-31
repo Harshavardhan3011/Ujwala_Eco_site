@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { verifyAdminFromRequest } from '@/lib/auth';
+import { executePrivilegedQuery, executePrivilegedQueryOne } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -12,49 +12,60 @@ export async function GET(req: NextRequest) {
     }
 
     const [
-      { count: totalOrders },
-      { count: pendingOrders },
-      { count: completedOrders },
-      { count: totalCustomers },
-      { count: totalProducts },
-      { count: lowStockProducts },
-      { count: outOfStockProducts },
-      { count: customOrdersCount },
-      { count: newCustomOrdersCount },
-      { count: reviewsCount },
-      { data: paidOrders },
-      { data: recentOrders },
-      { data: recentCustomOrders },
-      { data: featuredProducts },
+      totalOrdersRes,
+      pendingOrdersRes,
+      completedOrdersRes,
+      totalCustomersRes,
+      totalProductsRes,
+      lowStockProductsRes,
+      outOfStockProductsRes,
+      customOrdersCountRes,
+      newCustomOrdersCountRes,
+      reviewsCountRes,
+      revenueRes,
+      recentOrders,
+      recentCustomOrders,
+      featuredProducts,
     ] = await Promise.all([
-      db.from('orders').select('*', { count: 'exact', head: true }),
-      db.from('orders').select('*', { count: 'exact', head: true }).eq('order_status', 'PENDING'),
-      db.from('orders').select('*', { count: 'exact', head: true }).eq('order_status', 'DELIVERED'),
-      db.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'customer'),
-      db.from('products').select('*', { count: 'exact', head: true }),
-      db.from('products').select('*', { count: 'exact', head: true }).lte('stock_quantity', 10).gt('stock_quantity', 0),
-      db.from('products').select('*', { count: 'exact', head: true }).eq('stock_quantity', 0),
-      db.from('custom_orders').select('*', { count: 'exact', head: true }),
-      db.from('custom_orders').select('*', { count: 'exact', head: true }).eq('status', 'NEW'),
-      db.from('reviews').select('*', { count: 'exact', head: true }),
-      db.from('orders').select('total_amount').eq('payment_status', 'PAID'),
-      db.from('orders')
-        .select('id, order_number, shipping_name, shipping_phone, total_amount, order_status, payment_status, created_at, user:profiles(name, email)')
-        .order('created_at', { ascending: false })
-        .limit(8),
-      db.from('custom_orders')
-        .select('id, customer_name, phone, product_type, quantity, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5),
-      db.from('products')
-        .select('id, name, sku, price, discount_price, stock_quantity, is_featured, images:product_images(image_url)')
-        .eq('is_featured', true)
-        .limit(6),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.orders;"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.orders WHERE order_status = 'PENDING';"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.orders WHERE order_status = 'DELIVERED';"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.profiles WHERE LOWER(role) = 'customer';"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.products;"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.products WHERE stock_quantity <= 10 AND stock_quantity > 0;"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.products WHERE stock_quantity = 0;"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.custom_orders;"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.custom_orders WHERE status = 'NEW';"),
+      executePrivilegedQueryOne("SELECT COUNT(*)::int as count FROM public.reviews;"),
+      executePrivilegedQueryOne("SELECT COALESCE(SUM(total_amount), 0)::float as revenue FROM public.orders WHERE payment_status = 'PAID';"),
+      executePrivilegedQuery(`
+        SELECT 
+          o.id, o.order_number, o.shipping_name, o.shipping_phone, o.total_amount,
+          o.order_status, o.payment_status, o.created_at,
+          json_build_object('name', pr.name, 'email', pr.email) as user
+        FROM public.orders o
+        LEFT JOIN public.profiles pr ON pr.id = o.user_id
+        ORDER BY o.created_at DESC
+        LIMIT 8;
+      `),
+      executePrivilegedQuery(`
+        SELECT id, customer_name, phone, product_type, quantity, status, created_at
+        FROM public.custom_orders
+        ORDER BY created_at DESC
+        LIMIT 5;
+      `),
+      executePrivilegedQuery(`
+        SELECT 
+          p.id, p.name, p.sku, p.price, p.discount_price, p.stock_quantity, p.is_featured,
+          (SELECT pi.image_url FROM public.product_images pi WHERE pi.product_id = p.id ORDER BY pi.display_order ASC LIMIT 1) as image_url
+        FROM public.products p
+        WHERE p.is_featured = true
+        LIMIT 6;
+      `),
     ]);
 
-    const totalRevenue = (paidOrders || []).reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+    const totalRevenue = revenueRes?.revenue || 0;
 
-    // Map camelCase for frontend
     const mappedOrders = (recentOrders || []).map((o: any) => ({
       id: o.id,
       orderNumber: o.order_number,
@@ -81,33 +92,33 @@ export async function GET(req: NextRequest) {
       id: p.id,
       name: p.name,
       sku: p.sku,
-      price: p.price,
-      discountPrice: p.discount_price,
+      price: parseFloat(p.price),
+      discountPrice: p.discount_price ? parseFloat(p.discount_price) : null,
       stockQuantity: p.stock_quantity,
       isFeatured: p.is_featured,
-      imageUrl: p.images?.[0]?.image_url || null,
+      imageUrl: p.image_url || null,
     }));
 
     return NextResponse.json({
       stats: {
-        totalOrders: totalOrders || 0,
-        pendingOrders: pendingOrders || 0,
-        completedOrders: completedOrders || 0,
+        totalOrders: totalOrdersRes?.count || 0,
+        pendingOrders: pendingOrdersRes?.count || 0,
+        completedOrders: completedOrdersRes?.count || 0,
         totalRevenue,
-        totalCustomers: totalCustomers || 0,
-        totalProducts: totalProducts || 0,
-        lowStockProducts: lowStockProducts || 0,
-        outOfStockProducts: outOfStockProducts || 0,
-        customOrdersCount: customOrdersCount || 0,
-        newCustomOrdersCount: newCustomOrdersCount || 0,
-        reviewsCount: reviewsCount || 0,
+        totalCustomers: totalCustomersRes?.count || 0,
+        totalProducts: totalProductsRes?.count || 0,
+        lowStockProducts: lowStockProductsRes?.count || 0,
+        outOfStockProducts: outOfStockProductsRes?.count || 0,
+        customOrdersCount: customOrdersCountRes?.count || 0,
+        newCustomOrdersCount: newCustomOrdersCountRes?.count || 0,
+        reviewsCount: reviewsCountRes?.count || 0,
       },
       recentOrders: mappedOrders,
       recentCustomOrders: mappedCustomOrders,
       featuredProducts: mappedFeatured,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Fetch admin stats error:', error);
-    return NextResponse.json({ error: 'Failed to fetch admin stats' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to fetch admin stats' }, { status: 500 });
   }
 }

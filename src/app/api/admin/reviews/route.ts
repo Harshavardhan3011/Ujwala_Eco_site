@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { verifyAdminFromRequest } from '@/lib/auth';
+import { adminGetReviews } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -9,27 +9,20 @@ export async function GET(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Admin authorization required' }, { status: 403 });
 
   try {
-    const { data: reviews, error } = await db
-      .from('reviews')
-      .select('*, product:products(name, sku), user:profiles(name, email)')
-      .order('created_at', { ascending: false });
+    const reviews = await adminGetReviews();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-    const mapped = (reviews || []).map(r => ({
+    const mapped = (reviews || []).map((r: any) => ({
       id: r.id,
       rating: r.rating,
       comment: r.comment,
       isApproved: r.is_approved,
       createdAt: r.created_at,
-      productName: (r.product as any)?.name || 'Unknown Product',
-      productSku: (r.product as any)?.sku,
-      userName: (r.user as any)?.name || 'Anonymous',
-      userEmail: (r.user as any)?.email,
+      productName: r.product_name || 'Unknown Product',
+      userName: r.user_name || 'Anonymous',
     }));
 
     return NextResponse.json({ reviews: mapped });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to fetch reviews' }, { status: 500 });
   }
 }

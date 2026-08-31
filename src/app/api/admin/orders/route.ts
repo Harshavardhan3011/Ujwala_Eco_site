@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { verifyAdminFromRequest } from '@/lib/auth';
+import { adminGetOrders } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -10,13 +10,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Admin authorization required' }, { status: 403 });
   }
 
-  const { data: orders, error } = await db
-    .from('orders')
-    .select('*, order_items(*)')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    const orders = await adminGetOrders();
+    return NextResponse.json({ orders });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to fetch orders' }, { status: 500 });
   }
-  return NextResponse.json({ orders });
 }

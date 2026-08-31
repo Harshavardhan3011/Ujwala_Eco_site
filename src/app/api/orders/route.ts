@@ -1,5 +1,10 @@
-import { db } from '@/lib/db';
 import { getAuthFromRequest } from '@/lib/auth';
+import {
+  adminGetOrders,
+  customerGetOrders,
+  executePrivilegedQuery,
+  executePrivilegedQueryOne,
+} from '@/lib/serverDb';
 import { createPaymentOrder, isRazorpayConfigured } from '@/lib/razorpay';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -15,23 +20,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
 
-    let query = db.from('orders').select(`
-      *,
-      items:order_items(*),
-      payment:payments(*),
-      user:profiles(name, email, phone)
-    `).order('created_at', { ascending: false });
-
-    if (!['admin', 'superadmin'].includes(session.role?.toLowerCase())) {
-      query = query.eq('user_id', session.userId);
+    let orders: any[] = [];
+    if (['admin', 'superadmin'].includes(session.role?.toLowerCase())) {
+      orders = await adminGetOrders(status);
+    } else {
+      orders = await customerGetOrders(session.userId);
     }
-
-    if (status) {
-      query = query.eq('order_status', status);
-    }
-
-    const { data: orders, error } = await query;
-    if (error) throw error;
 
     return NextResponse.json({ orders: orders || [] });
   } catch (error) {
@@ -70,12 +64,17 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Fetch user's cart items
-    const { data: cartItems, error: cartErr } = await db.from('cart_items')
-      .select('*, product:products(*)')
-      .eq('user_id', session.userId);
+    // Fetch user's cart items with product details via privileged query
+    const cartItems = await executePrivilegedQuery(`
+      SELECT 
+        ci.*,
+        row_to_json(p.*) as product
+      FROM public.cart_items ci
+      JOIN public.products p ON p.id = ci.product_id
+      WHERE ci.user_id = $1;
+    `, [session.userId]);
 
-    if (cartErr || !cartItems || cartItems.length === 0) {
+    if (!cartItems || cartItems.length === 0) {
       return NextResponse.json({ error: 'Your shopping cart is empty' }, { status: 400 });
     }
 
@@ -121,39 +120,45 @@ export async function POST(req: NextRequest) {
     const initialPaymentStatus = 'PENDING';
 
     // 1. Create internal order in Supabase
-    const { data: order, error: orderErr } = await db.from('orders').insert({
-      order_number: orderNumber,
-      user_id: session.userId,
-      shipping_name: shippingName.trim(),
-      shipping_phone: shippingPhone.trim(),
-      shipping_address: shippingAddress.trim(),
-      shipping_city: shippingCity.trim(),
-      shipping_state: shippingState?.trim() || 'Andhra Pradesh',
-      shipping_postal_code: shippingPostalCode.trim(),
-      subtotal,
-      shipping_fee: shippingFee,
-      total_amount: totalAmount,
-      order_status: initialOrderStatus,
-      payment_status: initialPaymentStatus,
-      payment_method: paymentMethod,
-      customization_notes: customizationNotes || null,
-      custom_file_url: customFileUrl || null,
-    }).select().single();
+    const insertOrderSql = `
+      INSERT INTO public.orders (
+        order_number, user_id, shipping_name, shipping_phone, shipping_address,
+        shipping_city, shipping_state, shipping_postal_code, subtotal, shipping_fee,
+        total_amount, order_status, payment_status, payment_method, customization_notes,
+        custom_file_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      RETURNING *;
+    `;
 
-    if (orderErr || !order) {
-      console.error('Order insertion error:', orderErr);
+    const order = await executePrivilegedQueryOne(insertOrderSql, [
+      orderNumber,
+      session.userId,
+      shippingName.trim(),
+      shippingPhone.trim(),
+      shippingAddress.trim(),
+      shippingCity.trim(),
+      shippingState?.trim() || 'Andhra Pradesh',
+      shippingPostalCode.trim(),
+      subtotal,
+      shippingFee,
+      totalAmount,
+      initialOrderStatus,
+      initialPaymentStatus,
+      paymentMethod,
+      customizationNotes || null,
+      customFileUrl || null,
+    ]);
+
+    if (!order) {
       throw new Error('Failed to create order record in database.');
     }
 
     // 2. Insert order items
-    const itemsToInsert = orderItemsData.map((item) => ({
-      ...item,
-      order_id: order.id,
-    }));
-    const { error: itemsErr } = await db.from('order_items').insert(itemsToInsert);
-    if (itemsErr) {
-      console.error('Order items insertion error:', itemsErr);
-      throw new Error('Failed to save order items.');
+    for (const item of orderItemsData) {
+      await executePrivilegedQuery(`
+        INSERT INTO public.order_items (order_id, product_id, product_name, product_sku, price, quantity, customization_notes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7);
+      `, [order.id, item.product_id, item.product_name, item.product_sku, item.price, item.quantity, item.customization_notes]);
     }
 
     // 3. Handle payment method specific processing
@@ -167,45 +172,42 @@ export async function POST(req: NextRequest) {
           notes: { orderId: order.id, customerName: shippingName },
         });
 
-        await db.from('payments').insert({
-          order_id: order.id,
-          razorpay_order_id: razorpayOrder.id,
-          amount: totalAmount,
-          status: 'PENDING',
-        });
+        await executePrivilegedQuery(`
+          INSERT INTO public.payments (order_id, razorpay_order_id, amount, status)
+          VALUES ($1, $2, $3, $4);
+        `, [order.id, razorpayOrder.id, totalAmount, 'PENDING']);
       } catch (rzpErr: any) {
         console.error('Razorpay order creation error:', rzpErr);
         // Rollback order if razorpay creation fails
-        await db.from('orders').delete().eq('id', order.id);
+        await executePrivilegedQuery('DELETE FROM public.orders WHERE id = $1;', [order.id]);
         return NextResponse.json({
           error: rzpErr.message || 'Failed to initialize payment gateway. Please try again or choose COD.',
         }, { status: 400 });
       }
     } else {
       // For COD: create pending payment record
-      await db.from('payments').insert({
-        order_id: order.id,
-        amount: totalAmount,
-        status: 'PENDING',
-      });
+      await executePrivilegedQuery(`
+        INSERT INTO public.payments (order_id, amount, status)
+        VALUES ($1, $2, $3);
+      `, [order.id, totalAmount, 'PENDING']);
 
       // Deduct stock for COD confirmed order
-      for (const item of itemsToInsert) {
-        const { data: prod } = await db.from('products').select('stock_quantity').eq('id', item.product_id).single();
-        if (prod) {
-          const newStock = Math.max(0, prod.stock_quantity - item.quantity);
-          await db.from('products').update({ stock_quantity: newStock }).eq('id', item.product_id);
-        }
+      for (const item of orderItemsData) {
+        await executePrivilegedQuery(`
+          UPDATE public.products
+          SET stock_quantity = GREATEST(0, stock_quantity - $1)
+          WHERE id = $2;
+        `, [item.quantity, item.product_id]);
       }
     }
 
     // 4. Clear user's cart
-    await db.from('cart_items').delete().eq('user_id', session.userId);
+    await executePrivilegedQuery('DELETE FROM public.cart_items WHERE user_id = $1;', [session.userId]);
 
     return NextResponse.json({
       order: {
         ...order,
-        items: itemsToInsert,
+        items: orderItemsData,
       },
       razorpayOrder,
       isCod,

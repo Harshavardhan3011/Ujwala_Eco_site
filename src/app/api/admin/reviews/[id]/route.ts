@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { verifyAdminFromRequest } from '@/lib/auth';
+import { adminUpdateReview, adminDeleteReview } from '@/lib/serverDb';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -10,17 +10,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   try {
     const { isApproved } = await req.json();
-    const { data, error } = await db
-      .from('reviews')
-      .update({ is_approved: isApproved })
-      .eq('id', params.id)
-      .select()
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ review: data });
+    const review = await adminUpdateReview(params.id, Boolean(isApproved));
+    return NextResponse.json({ review });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to update review' }, { status: 500 });
   }
 }
 
@@ -29,10 +22,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!admin) return NextResponse.json({ error: 'Admin authorization required' }, { status: 403 });
 
   try {
-    const { error } = await db.from('reviews').delete().eq('id', params.id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await adminDeleteReview(params.id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to delete review' }, { status: 500 });
   }
 }
