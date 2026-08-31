@@ -101,12 +101,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    if (quantity < product.min_order_quantity) {
-      return NextResponse.json({
-        error: `Minimum order quantity for this product is ${product.min_order_quantity}`,
-      }, { status: 400 });
-    }
-
     if (quantity > product.stock_quantity) {
       return NextResponse.json({
         error: `Only ${product.stock_quantity} items currently in stock`,

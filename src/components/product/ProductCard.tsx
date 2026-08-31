@@ -43,7 +43,7 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     setIsAdding(true);
-    const result = await addToCart(product.id, product.minOrderQuantity || 1);
+    const result = await addToCart(product.id, 1);
     setIsAdding(false);
     if (result.success) {
       setAddedSuccess(true);
@@ -58,113 +58,109 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
 
   const discountPercent = product.discountPrice
     ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
-    : 0;
+    : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-eco-100 overflow-hidden shadow-xs hover:shadow-eco-lg transition-all duration-300 flex flex-col group relative">
-      {/* Image Container */}
-      <div className="relative aspect-square bg-canvas-100 overflow-hidden">
+    <div className="group bg-white rounded-2xl border border-eco-100 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col h-full">
+      {/* Product Image Section */}
+      <div className="relative aspect-4/3 bg-eco-50 overflow-hidden">
         <Link href={`/products/${product.slug}`} className="block w-full h-full">
           <img
             src={primaryImage}
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
-            onError={(e) => {
-              if (rawPrimaryImage.startsWith('/bags/')) {
-                (e.target as HTMLImageElement).src = rawPrimaryImage;
-              } else {
-                (e.target as HTMLImageElement).src = '/placeholder-product.svg';
-              }
-              (e.target as HTMLImageElement).onerror = null;
-            }}
           />
         </Link>
 
         {/* Badges */}
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10">
-          {discountPercent > 0 && (
-            <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+          {discountPercent && (
+            <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
               {discountPercent}% OFF
             </span>
           )}
-          {product.isCustomizable && (
-            <span className="bg-jute-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
-              Customizable
+          {product.isFeatured && (
+            <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+              Featured
             </span>
           )}
           {product.isBestseller && (
-            <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+            <span className="bg-eco-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
               Bestseller
             </span>
           )}
         </div>
 
-        {/* Wishlist Button */}
-        <button
-          onClick={handleWishlist}
-          className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-xs transition-colors z-10 shadow-xs ${
-            inWishlist ? 'bg-rose-50 text-rose-600' : 'bg-white/80 text-slate-600 hover:text-rose-600'
-          }`}
-          title="Add to Wishlist"
-        >
-          <Heart className={`w-4 h-4 ${inWishlist ? 'fill-rose-600' : ''}`} />
-        </button>
-
-        {/* Quick View Button */}
-        {onQuickView && (
+        {/* Quick Action Buttons */}
+        <div className="absolute top-2.5 right-2.5 flex flex-col gap-1.5 z-10">
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              onQuickView(product);
-            }}
-            className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-white/90 hover:bg-white text-slate-800 text-xs font-bold px-3 py-1.5 rounded-full shadow-md backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center gap-1 z-10"
+            onClick={handleWishlist}
+            aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+            className={`p-1.5 rounded-full shadow-xs transition-all ${
+              inWishlist
+                ? 'bg-rose-50 text-rose-500 hover:bg-rose-100'
+                : 'bg-white/90 text-slate-600 hover:text-rose-500 hover:bg-white'
+            }`}
           >
-            <Eye className="w-3.5 h-3.5" /> Quick View
+            <Heart className={`w-3.5 h-3.5 ${inWishlist ? 'fill-current' : ''}`} />
           </button>
-        )}
+          {onQuickView && (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                onQuickView(product);
+              }}
+              aria-label="Quick preview"
+              className="p-1.5 bg-white/90 text-slate-600 hover:text-eco-700 hover:bg-white rounded-full shadow-xs transition-all opacity-0 group-hover:opacity-100"
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Card Content */}
-      <div className="p-4 flex-1 flex flex-col justify-between space-y-2">
+      {/* Product Info */}
+      <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
         <div>
           {/* Category */}
           {product.category && (
-            <span className="text-[10px] text-eco-700 font-bold uppercase tracking-wider block mb-0.5">
+            <p className="text-[11px] text-eco-600 font-medium mb-0.5">
               {product.category.name}
-            </span>
+            </p>
           )}
 
           {/* Title */}
-          <Link
-            href={`/products/${product.slug}`}
-            className="font-serif font-bold text-sm text-slate-900 hover:text-eco-700 line-clamp-2 transition-colors"
-          >
-            {product.name}
+          <Link href={`/products/${product.slug}`} className="block">
+            <h3 className="font-serif font-bold text-xs text-slate-900 line-clamp-2 hover:text-eco-700 transition-colors">
+              {product.name}
+            </h3>
           </Link>
 
           {/* Rating */}
-          <div className="flex items-center gap-1 mt-1.5">
+          <div className="flex items-center gap-1 mt-1">
             <div className="flex text-amber-400">
               {[...Array(5)].map((_, i) => (
                 <Star
                   key={i}
-                  className={`w-3 h-3 ${
-                    i < Math.floor(product.avgRating || 5) ? 'fill-amber-400' : 'text-slate-300'
+                  className={`w-2.5 h-2.5 ${
+                    i < Math.floor(product.avgRating || 5)
+                      ? 'fill-current text-amber-400'
+                      : 'text-slate-200'
                   }`}
                 />
               ))}
             </div>
-            <span className="text-[11px] text-slate-500 font-medium">
-              ({product.totalReviews || 1})
+            <span className="text-[10px] text-slate-400">
+              ({product.totalReviews || 0})
             </span>
           </div>
         </div>
 
-        {/* Price & Actions */}
-        <div className="pt-2 border-t border-eco-50 space-y-2">
-          <div className="flex items-baseline gap-2">
-            <span className="font-bold text-base text-eco-900">
+        {/* Pricing & Cart Action */}
+        <div className="space-y-2 pt-1 border-t border-eco-50">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-serif font-bold text-sm text-slate-900">
               {formatPrice(product.discountPrice ?? product.price)}
             </span>
             {product.discountPrice && (
@@ -173,13 +169,6 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
               </span>
             )}
           </div>
-
-          {/* MOQ Indicator */}
-          {product.minOrderQuantity > 1 && (
-            <p className="text-[10px] text-slate-500 font-medium">
-              Min Order: <span className="font-bold text-slate-700">{product.minOrderQuantity} pcs</span>
-            </p>
-          )}
 
           {/* Add to Cart Button */}
           <button

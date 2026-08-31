@@ -54,7 +54,7 @@ export default function ProductDetailPage() {
         if (data.product) {
           setProduct(data.product);
           setSelectedImage(data.product.images?.[0]?.imageUrl || '/bags/b1.jpeg');
-          setQuantity(data.product.minOrderQuantity || 1);
+          setQuantity(1);
         }
         if (data.relatedProducts) {
           setRelatedProducts(data.relatedProducts);
@@ -283,8 +283,8 @@ export default function ProductDetailPage() {
               </span>
             </div>
             <div>
-              <span className="text-slate-400 block font-medium">Min Order Quantity</span>
-              <span className="font-bold text-eco-800">{product.minOrderQuantity || 1} Pcs</span>
+              <span className="text-slate-400 block font-medium">Eco-Friendly</span>
+              <span className="font-bold text-eco-800">100% Biodegradable</span>
             </div>
           </div>
 
@@ -313,7 +313,7 @@ export default function ProductDetailPage() {
               <span className="text-xs font-bold text-slate-700">Quantity:</span>
               <div className="flex items-center border border-eco-300 rounded-xl bg-white">
                 <button
-                  onClick={() => setQuantity(Math.max(product.minOrderQuantity || 1, quantity - 1))}
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   className="px-3 py-1.5 text-slate-700 font-bold hover:bg-canvas-100"
                 >
                   -

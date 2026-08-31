@@ -4,9 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const rawDbUrl = process.env.SUPABASE_DB_URL;
-
-const connectionString = rawDbUrl;
+const connectionString = process.env.SUPABASE_DB_URL;
 
 // Global connection pool singleton across serverless invocations
 declare global {
@@ -385,6 +383,300 @@ export async function customerGetOrders(userId: string) {
     FROM public.orders o
     WHERE o.user_id = $1
     ORDER BY o.created_at DESC;
+  `, [userId]);
+}
+
+// ==========================================
+// 3B. ORDER REQUEST OPERATIONS (EMAIL WORKFLOW)
+// ==========================================
+
+export interface CreateOrderRequestPayload {
+  customerId?: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  shippingAddress: string;
+  shippingCity: string;
+  shippingState: string;
+  shippingPostalCode: string;
+  shippingCountry?: string;
+  customerNotes?: string | null;
+  customizationNotes?: string | null;
+  items: {
+    productId: string;
+    quantity: number;
+    customizationNotes?: string | null;
+  }[];
+}
+
+export async function createOrderRequestPrivileged(payload: CreateOrderRequestPayload) {
+  return withTransaction(async (client) => {
+    if (!payload.items || payload.items.length === 0) {
+      throw new Error('Order request must contain at least one item');
+    }
+
+    // 1. Fetch products & validate stock/active
+    const productIds = payload.items.map(i => i.productId);
+    const prodRes = await client.query(
+      `SELECT id, name, sku, price, discount_price, stock_quantity, product_status FROM public.products WHERE id = ANY($1::uuid[]);`,
+      [productIds]
+    );
+
+    const productMap = new Map<string, any>();
+    prodRes.rows.forEach(p => productMap.set(p.id, p));
+
+    let subtotal = 0;
+    const validatedItems: any[] = [];
+
+    for (const item of payload.items) {
+      const prod = productMap.get(item.productId);
+      if (!prod) {
+        throw new Error(`Product not found: ${item.productId}`);
+      }
+      if (prod.product_status && prod.product_status !== 'ACTIVE') {
+        throw new Error(`Product is no longer available: ${prod.name}`);
+      }
+      if (item.quantity < 1) {
+        throw new Error(`Invalid quantity for ${prod.name}. Minimum is 1.`);
+      }
+      if (item.quantity > prod.stock_quantity) {
+        throw new Error(`Insufficient stock for "${prod.name}". Only ${prod.stock_quantity} available.`);
+      }
+
+      const unitPrice = parseFloat(prod.discount_price ?? prod.price);
+      const lineTotal = unitPrice * item.quantity;
+      subtotal += lineTotal;
+
+      validatedItems.push({
+        productId: prod.id,
+        name: prod.name,
+        sku: prod.sku || 'UJW-PROD',
+        quantity: item.quantity,
+        unitPrice,
+        lineTotal,
+        customizationNotes: item.customizationNotes || payload.customizationNotes || null,
+      });
+    }
+
+    // 2. Calculate centralized delivery fee: Free above ₹1000 else ₹50
+    const deliveryCharge = subtotal >= 1000 ? 0 : 50;
+    const totalAmount = subtotal + deliveryCharge;
+
+    // 3. Generate human readable reference number
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randCode = Math.floor(1000 + Math.random() * 9000);
+    const requestNumber = `UJW-${today}-${randCode}`;
+
+    // 4. Insert into order_requests
+    const reqRes = await client.query(
+      `INSERT INTO public.order_requests (
+        request_number, customer_id, customer_name, customer_email, customer_phone,
+        shipping_address, shipping_city, shipping_state, shipping_postal_code, shipping_country,
+        subtotal, delivery_charge, total_amount, status, customer_notes, customization_notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'PENDING_CONFIRMATION', $14, $15)
+      RETURNING *;`,
+      [
+        requestNumber,
+        payload.customerId || null,
+        payload.customerName.trim(),
+        payload.customerEmail.trim().toLowerCase(),
+        payload.customerPhone.trim(),
+        payload.shippingAddress.trim(),
+        payload.shippingCity.trim(),
+        payload.shippingState.trim(),
+        payload.shippingPostalCode.trim(),
+        (payload.shippingCountry || 'India').trim(),
+        subtotal,
+        deliveryCharge,
+        totalAmount,
+        payload.customerNotes || null,
+        payload.customizationNotes || null,
+      ]
+    );
+
+    const orderRequest = reqRes.rows[0];
+
+    // 5. Insert order_request_items snapshots
+    for (const item of validatedItems) {
+      await client.query(
+        `INSERT INTO public.order_request_items (
+          request_id, product_id, product_name_snapshot, sku_snapshot,
+          quantity, unit_price, line_total, customization_snapshot
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+        [
+          orderRequest.id,
+          item.productId,
+          item.name,
+          item.sku,
+          item.quantity,
+          item.unitPrice,
+          item.lineTotal,
+          item.customizationNotes,
+        ]
+      );
+    }
+
+    return {
+      ...orderRequest,
+      items: validatedItems,
+    };
+  });
+}
+
+export async function adminGetOrderRequests(status?: string | null) {
+  let query = `
+    SELECT 
+      r.*,
+      COALESCE(
+        (SELECT json_agg(ri.*) FROM public.order_request_items ri WHERE ri.request_id = r.id),
+        '[]'::json
+      ) as items
+    FROM public.order_requests r
+  `;
+
+  const params: any[] = [];
+  if (status) {
+    query += ` WHERE r.status = $1`;
+    params.push(status);
+  }
+  query += ` ORDER BY r.created_at DESC;`;
+
+  return executePrivilegedQuery(query, params);
+}
+
+export async function adminGetOrderRequestById(id: string) {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const whereClause = isUuid ? `(r.id = $1::uuid OR r.request_number = $1)` : `r.request_number = $1`;
+
+  const query = `
+    SELECT 
+      r.*,
+      COALESCE(
+        (SELECT json_agg(ri.*) FROM public.order_request_items ri WHERE ri.request_id = r.id),
+        '[]'::json
+      ) as items
+    FROM public.order_requests r
+    WHERE ${whereClause}
+    LIMIT 1;
+  `;
+
+  return executePrivilegedQueryOne(query, [id]);
+}
+
+export async function adminUpdateOrderRequestStatus(
+  id: string,
+  status: string,
+  emailSent?: boolean,
+  emailError?: string
+) {
+  const clauses = ['status = $1', 'updated_at = NOW()'];
+  const params: any[] = [status];
+  let idx = 2;
+
+  if (emailSent !== undefined) {
+    clauses.push(`email_sent = $${idx++}`);
+    params.push(emailSent);
+  }
+  if (emailError !== undefined) {
+    clauses.push(`email_error = $${idx++}`);
+    params.push(emailError);
+  }
+
+  params.push(id);
+
+  await executePrivilegedQuery(
+    `UPDATE public.order_requests SET ${clauses.join(', ')} WHERE id = $${idx};`,
+    params
+  );
+
+  return adminGetOrderRequestById(id);
+}
+
+export async function adminConvertOrderRequestToOrder(requestId: string, finalConfirmedTotal?: number) {
+  return withTransaction(async (client) => {
+    const reqRes = await client.query('SELECT * FROM public.order_requests WHERE id = $1 FOR UPDATE;', [requestId]);
+    const req = reqRes.rows[0];
+    if (!req) throw new Error('Order request not found');
+
+    if (req.confirmed_order_id) {
+      throw new Error('This order request has already been converted to an order');
+    }
+
+    const itemsRes = await client.query('SELECT * FROM public.order_request_items WHERE request_id = $1;', [requestId]);
+    const items = itemsRes.rows;
+
+    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+    const finalTotal = finalConfirmedTotal ?? parseFloat(req.total_amount);
+
+    // 1. Create Confirmed Order
+    const newOrderRes = await client.query(
+      `INSERT INTO public.orders (
+        order_number, user_id, shipping_name, shipping_phone, shipping_address,
+        shipping_city, shipping_state, shipping_postal_code,
+        subtotal, shipping_fee, tax, total_amount, order_status, payment_status, payment_method, customization_notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $11, 'CONFIRMED', 'PENDING', 'DIRECT_INVOICE', $12)
+      RETURNING *;`,
+      [
+        orderNumber,
+        req.customer_id || null,
+        req.customer_name,
+        req.customer_phone,
+        req.shipping_address,
+        req.shipping_city,
+        req.shipping_state,
+        req.shipping_postal_code,
+        req.subtotal,
+        req.delivery_charge,
+        finalTotal,
+        `Converted from Request #${req.request_number}. ${req.customer_notes || ''}`,
+      ]
+    );
+
+    const createdOrder = newOrderRes.rows[0];
+
+    // 2. Insert order_items
+    for (const item of items) {
+      await client.query(
+        `INSERT INTO public.order_items (order_id, product_id, product_name, product_sku, price, quantity, customization_notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7);`,
+        [
+          createdOrder.id,
+          item.product_id,
+          item.product_name_snapshot,
+          item.sku_snapshot,
+          item.unit_price,
+          item.quantity,
+          item.customization_snapshot,
+        ]
+      );
+    }
+
+    // 3. Update order_requests with confirmed_order_id & final_confirmed_total
+    await client.query(
+      `UPDATE public.order_requests
+       SET confirmed_order_id = $1, final_confirmed_total = $2, status = 'CONFIRMED', updated_at = NOW()
+       WHERE id = $3;`,
+      [createdOrder.id, finalTotal, requestId]
+    );
+
+    return {
+      order: createdOrder,
+      orderRequest: req,
+    };
+  });
+}
+
+export async function customerGetOrderRequests(userId: string) {
+  return executePrivilegedQuery(`
+    SELECT 
+      r.*,
+      COALESCE(
+        (SELECT json_agg(ri.*) FROM public.order_request_items ri WHERE ri.request_id = r.id),
+        '[]'::json
+      ) as items
+    FROM public.order_requests r
+    WHERE r.customer_id = $1
+    ORDER BY r.created_at DESC;
   `, [userId]);
 }
 

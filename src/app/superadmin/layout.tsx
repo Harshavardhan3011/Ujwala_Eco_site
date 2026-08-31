@@ -24,6 +24,7 @@ import {
   ExternalLink,
   ShieldCheck,
   User as UserIcon,
+  Sparkles,
 } from 'lucide-react';
 
 interface NavItem {
@@ -50,8 +51,9 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Orders',
     items: [
-      { name: 'Orders', href: '/superadmin/orders', icon: ShoppingBag },
-      { name: 'Custom Orders', href: '/superadmin/custom-orders', icon: FileText },
+      { name: 'Order Requests', href: '/superadmin/order-requests', icon: FileText },
+      { name: 'Confirmed Orders', href: '/superadmin/orders', icon: ShoppingBag },
+      { name: 'Custom Orders', href: '/superadmin/custom-orders', icon: Sparkles },
     ],
   },
   {
@@ -80,7 +82,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/superadmin': 'Dashboard',
   '/superadmin/products': 'Products',
   '/superadmin/categories': 'Categories',
-  '/superadmin/orders': 'Orders',
+  '/superadmin/order-requests': 'Order Requests',
+  '/superadmin/orders': 'Confirmed Orders',
   '/superadmin/custom-orders': 'Custom Orders',
   '/superadmin/customers': 'Customers',
   '/superadmin/inventory': 'Inventory',

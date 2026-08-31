@@ -19,7 +19,7 @@ export const QuickViewModal = ({ product, onClose }: QuickViewModalProps) => {
 
   const initialRawImage = product.images[0]?.imageUrl || '/bags/b1.jpeg';
   const [selectedImage, setSelectedImage] = useState(initialRawImage);
-  const [quantity, setQuantity] = useState(product.minOrderQuantity || 1);
+  const [quantity, setQuantity] = useState(1);
   const [customizationNotes, setCustomizationNotes] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [addedSuccess, setAddedSuccess] = useState(false);
@@ -160,7 +160,7 @@ export const QuickViewModal = ({ product, onClose }: QuickViewModalProps) => {
               <span className="text-xs font-bold text-slate-700">Quantity:</span>
               <div className="flex items-center border border-eco-300 rounded-lg bg-white">
                 <button
-                  onClick={() => setQuantity(Math.max(product.minOrderQuantity || 1, quantity - 1))}
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   className="px-3 py-1 text-slate-700 font-bold"
                 >
                   -
@@ -173,11 +173,6 @@ export const QuickViewModal = ({ product, onClose }: QuickViewModalProps) => {
                   +
                 </button>
               </div>
-              {product.minOrderQuantity > 1 && (
-                <span className="text-[11px] text-slate-500 font-medium">
-                  (Min Order: {product.minOrderQuantity} pcs)
-                </span>
-              )}
             </div>
 
             {/* Action Buttons */}

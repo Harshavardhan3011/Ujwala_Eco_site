@@ -23,6 +23,7 @@ import {
   ExternalLink,
   ShieldCheck,
   User as UserIcon,
+  Sparkles,
 } from 'lucide-react';
 
 interface NavItem {
@@ -49,8 +50,9 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Orders',
     items: [
-      { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
-      { name: 'Custom Orders', href: '/admin/custom-orders', icon: FileText },
+      { name: 'Order Requests', href: '/admin/order-requests', icon: FileText },
+      { name: 'Confirmed Orders', href: '/admin/orders', icon: ShoppingBag },
+      { name: 'Custom Orders', href: '/admin/custom-orders', icon: Sparkles },
     ],
   },
   {
@@ -73,7 +75,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin': 'Dashboard',
   '/admin/products': 'Products',
   '/admin/categories': 'Categories',
-  '/admin/orders': 'Orders',
+  '/admin/order-requests': 'Order Requests',
+  '/admin/orders': 'Confirmed Orders',
   '/admin/custom-orders': 'Custom Orders',
   '/admin/customers': 'Customers',
   '/admin/inventory': 'Inventory',
