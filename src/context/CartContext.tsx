@@ -9,7 +9,7 @@ export interface CartItemType {
   productName: string;
   productSku: string;
   productSlug: string;
-  image: string;
+  image: string | null;
   price: number;
   originalPrice: number;
   quantity: number;

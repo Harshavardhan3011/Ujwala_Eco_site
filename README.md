@@ -10,7 +10,7 @@ A production-ready full-stack e-commerce web application built for **Ujwala Eco 
 - **Founder**: N. Suguna
 - **Location & Address**: D.No. 7-116, Simhadrinagar, Sector-1, Duvvada, Near VSEZ, Visakhapatnam - 530 049, Andhra Pradesh, India
 - **Contact Numbers**: +91 9849530536, +91 9701347838, +91 8374431924
-- **Email**: contact@ujwalaeco.com
+- **Email**: ujwalaeco@gmail.com
 - **Social Impact**: Ujwala Educational & Social Trust (Est. 2012) – Book & stationery distribution, merit scholarships, old-age pensions.
 - **Mission**: Ban single-use plastic, promote 100% natural jute yarn alternatives, and empower local women homemakers through skill development and employment.
 

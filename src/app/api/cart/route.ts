@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
         const images = item.images || [];
         const primaryImg = images.find((i: any) => i.is_primary) || images[0];
-        const image = primaryImg ? primaryImg.image_url : '/bags/b1.jpeg';
+        const image = primaryImg?.image_url || null;
 
         return {
           id: item.id,

@@ -122,7 +122,7 @@ export const Footer = () => {
             </li>
             <li className="flex items-center gap-2">
               <Mail className="w-4 h-4 text-jute-400 shrink-0" />
-              <span>contact@ujwalaeco.com</span>
+              <span>ujwalaeco@gmail.com</span>
             </li>
           </ul>
         </div>

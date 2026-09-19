@@ -540,9 +540,13 @@ export default function CheckoutPage() {
               {cartItems.map((item) => (
                 <div key={item.id} className="flex gap-3 py-2 border-b border-eco-50 last:border-0">
                   <img
-                    src={item.image}
+                    src={item.image ?? '/placeholder-product.svg'}
                     alt={item.productName}
                     className="w-12 h-12 object-cover rounded-lg border border-eco-100 shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder-product.svg';
+                      (e.target as HTMLImageElement).onerror = null;
+                    }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-slate-900 truncate">{item.productName}</p>

@@ -3,8 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
-import { X, Trash2, ShoppingBag, Plus, Minus, ArrowRight, Truck } from 'lucide-react';
+import { X, Trash2, ShoppingBag, Plus, Minus, ArrowRight, Truck, MessageCircle } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
+import { getStorageUrl } from '@/lib/storage';
 
 export const CartDrawer = () => {
   const {
@@ -94,9 +95,13 @@ export const CartDrawer = () => {
                   className="flex gap-3 p-3 bg-canvas-50 rounded-xl border border-eco-100 relative group"
                 >
                   <img
-                    src={item.image}
+                    src={getStorageUrl('products', item.image || '/placeholder-product.svg')}
                     alt={item.productName}
-                    className="w-16 h-16 object-cover rounded-lg border border-eco-200 shrink-0"
+                    className="w-16 h-16 object-contain rounded-lg border border-eco-200 shrink-0 bg-eco-50"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder-product.svg';
+                      (e.target as HTMLImageElement).onerror = null;
+                    }}
                   />
                   <div className="flex-1 min-w-0">
                     <h5 className="text-xs font-bold text-slate-900 truncate">{item.productName}</h5>
@@ -161,13 +166,13 @@ export const CartDrawer = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-2">
+              <div className="grid grid-cols-1 gap-2 pt-2">
                 <Link
                   href="/cart"
                   onClick={() => setIsCartOpen(false)}
-                  className="bg-white border border-eco-300 hover:bg-canvas-100 text-eco-900 text-xs font-bold text-center py-2.5 rounded-xl transition-colors"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold text-center py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-colors"
                 >
-                  View Detailed Cart
+                  <MessageCircle className="w-3.5 h-3.5" /> Order via WhatsApp
                 </Link>
 
                 <Link
@@ -175,7 +180,15 @@ export const CartDrawer = () => {
                   onClick={() => setIsCartOpen(false)}
                   className="bg-eco-700 hover:bg-eco-800 text-white text-xs font-bold text-center py-2.5 rounded-xl flex items-center justify-center gap-1 shadow-md transition-colors"
                 >
-                  Checkout <ArrowRight className="w-3.5 h-3.5" />
+                  Full Checkout <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+
+                <Link
+                  href="/cart"
+                  onClick={() => setIsCartOpen(false)}
+                  className="bg-white border border-eco-300 hover:bg-canvas-100 text-eco-900 text-xs font-bold text-center py-2 rounded-xl transition-colors"
+                >
+                  View Detailed Cart
                 </Link>
               </div>
             </div>

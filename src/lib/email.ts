@@ -43,7 +43,7 @@ export function isEmailConfigured(): boolean {
 }
 
 export function getSellerEmail(): string {
-  return process.env.UJWALA_ORDER_EMAIL || 'ujwalaecoproducts@gmail.com';
+  return process.env.UJWALA_ORDER_EMAIL || 'ujwalaeco@gmail.com';
 }
 
 function formatCurrency(amount: number): string {
@@ -305,7 +305,7 @@ export async function sendOrderRequestEmails(data: OrderRequestEmailData): Promi
   // Method 1: Resend API
   if (process.env.RESEND_API_KEY) {
     try {
-      const fromEmail = process.env.RESEND_FROM || 'Ujwala Eco Products <orders@ujwalaeco.com>';
+      const fromEmail = process.env.RESEND_FROM || 'Ujwala Eco Products <ujwalaeco@gmail.com>';
 
       // 1. Send to seller
       const sellerRes = await fetch('https://api.resend.com/emails', {

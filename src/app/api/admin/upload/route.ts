@@ -68,10 +68,30 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     // adminUploadFile already logs the technical Supabase error server-side.
-    // Here we return the already-sanitised, admin-facing message from that function.
     console.error('[/api/admin/upload POST] Upload error:', error.message);
+
+    const isConfigError =
+      error.message?.includes('not configured') ||
+      error.message?.includes('privileged key') ||
+      error.message?.includes('service_role');
+
+    if (isConfigError) {
+      return NextResponse.json(
+        {
+          error:
+            'Image upload is not configured. To fix:\n' +
+            '1. Supabase Dashboard → Settings → API Keys → Secret key\n' +
+            '2. Copy the key (sb_secret_...)\n' +
+            '3. Add SUPABASE_SECRET_KEY=sb_secret_... to .env.local\n' +
+            '4. Add to Vercel → Project → Settings → Environment Variables',
+          setupRequired: true,
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
-      { error: error.message || 'Image upload failed. Please check your storage permissions or contact the administrator.' },
+      { error: error.message || 'Image upload failed. Please check storage permissions.' },
       { status: 500 }
     );
   }

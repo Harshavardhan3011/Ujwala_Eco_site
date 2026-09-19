@@ -53,7 +53,7 @@ export default function ContactPage() {
                 <Mail className="w-5 h-5 text-jute-400 shrink-0 mt-0.5" />
                 <span>
                   <strong>Email Support:</strong><br />
-                  contact@ujwalaeco.com
+                  ujwalaeco@gmail.com
                 </span>
               </div>
             </div>
