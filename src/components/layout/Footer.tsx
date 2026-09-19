@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { MapPin, Phone, Mail, MessageCircle, Heart, ShieldCheck, Truck, RefreshCw } from 'lucide-react';
+import { BUSINESS_PHONE_DISPLAY, BUSINESS_TEL, WHATSAPP_LINK } from '@/lib/constants';
 
 export const Footer = () => {
   return (
@@ -67,7 +68,7 @@ export const Footer = () => {
           </p>
           <div className="pt-2">
             <a
-              href="https://wa.me/919849530536"
+              href={WHATSAPP_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-full transition-colors"
@@ -118,7 +119,9 @@ export const Footer = () => {
             </li>
             <li className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-jute-400 shrink-0" />
-              <span>+91 9849530536 / 9701347838 / 8374431924</span>
+              <a href={BUSINESS_TEL} className="hover:text-jute-300 transition-colors">
+                {BUSINESS_PHONE_DISPLAY}
+              </a>
             </li>
             <li className="flex items-center gap-2">
               <Mail className="w-4 h-4 text-jute-400 shrink-0" />

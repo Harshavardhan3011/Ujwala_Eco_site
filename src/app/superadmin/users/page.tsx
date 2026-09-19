@@ -267,7 +267,7 @@ export default function SuperadminUsersPage() {
                 <label className="text-xs font-bold text-slate-700 block mb-1">Phone (Optional)</label>
                 <input
                   type="text"
-                  placeholder="+91 9849530536"
+                  placeholder="+91 8247671857"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-canvas-100 border border-eco-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-amber-600"

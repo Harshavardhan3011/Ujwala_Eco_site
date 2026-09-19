@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   Package,
 } from 'lucide-react';
+import { BUSINESS_PHONE_DISPLAY, BUSINESS_TEL, WHATSAPP_LINK } from '@/lib/constants';
 
 export const Header = () => {
   const pathname = usePathname();
@@ -97,11 +98,11 @@ export const Header = () => {
             <span>🌿 Direct Factory Jute Bags & Custom Orders for Weddings, Events & Shops!</span>
           </div>
           <div className="hidden md:flex items-center gap-4 text-eco-100">
-            <a href="tel:+919849530536" className="flex items-center gap-1 hover:text-white transition-colors">
-              <Phone className="w-3 h-3" /> +91 9849530536
+            <a href={BUSINESS_TEL} className="flex items-center gap-1 hover:text-white transition-colors">
+              <Phone className="w-3 h-3" /> {BUSINESS_PHONE_DISPLAY}
             </a>
             <a
-              href="https://wa.me/919849530536"
+              href={WHATSAPP_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-white transition-colors"
@@ -339,6 +340,22 @@ export const Header = () => {
                 {link.name}
               </Link>
             ))}
+            <div className="pt-2 flex flex-col gap-2">
+              <a
+                href={BUSINESS_TEL}
+                className="flex items-center gap-2 text-xs font-bold text-slate-700 py-1.5"
+              >
+                <Phone className="w-3.5 h-3.5 text-eco-700" /> {BUSINESS_PHONE_DISPLAY}
+              </a>
+              <a
+                href={WHATSAPP_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs font-bold text-emerald-700 py-1.5"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp Direct
+              </a>
+            </div>
           </div>
         </div>
       )}

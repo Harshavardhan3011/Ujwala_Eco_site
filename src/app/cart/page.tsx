@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import { getStorageUrl } from '@/lib/storage';
+import { WHATSAPP_NUMBER } from '@/lib/constants';
 
 interface CustomerForm {
   name: string;
@@ -36,7 +37,7 @@ export default function CartPage() {
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [formErrors, setFormErrors] = useState<Partial<CustomerForm>>({});
   const [isOpening, setIsOpening] = useState(false);
-  const [waNumber, setWaNumber] = useState('919849530536');
+  const [waNumber, setWaNumber] = useState(WHATSAPP_NUMBER);
 
   // Fetch WhatsApp number from the server-side config endpoint
   useEffect(() => {
@@ -348,7 +349,7 @@ export default function CartPage() {
                     <input
                       type="tel"
                       required
-                      placeholder="e.g. 9849530536"
+                      placeholder="e.g. 8247671857"
                       value={form.mobile}
                       onChange={(e) => setForm({ ...form, mobile: e.target.value })}
                       className={fieldCls(formErrors.mobile)}

@@ -2,16 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { Settings, Save, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
+import { BUSINESS_PHONE_DISPLAY, WHATSAPP_NUMBER } from '@/lib/constants';
 
 export default function AdminSiteSettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({
     site_name: 'Ujwala Eco Products',
     site_tagline: 'Say No to Plastic – Handcrafted Eco-Friendly Jute Bags & Return Gifts',
-    phone_primary: '+91 9849530536',
-    phone_secondary: '+91 9701347838, +91 8374431924',
+    phone_primary: BUSINESS_PHONE_DISPLAY,
+    phone_secondary: '',
     email: 'ujwalaeco@gmail.com',
     address: 'D.No. 7-116, Simhadrinagar, Sector-1, Duvvada, Near VSEZ, Visakhapatnam - 530 049, Andhra Pradesh',
-    whatsapp_number: '919849530536',
+    whatsapp_number: WHATSAPP_NUMBER,
     announcement_banner: '🌿 Custom Jute Bags Available for Weddings, Housewarmings & Bulk Shop Orders!',
   });
 
@@ -178,15 +179,15 @@ export default function AdminSiteSettingsPage() {
               type="text"
               value={settings.whatsapp_number || ''}
               onChange={(e) => setSettings({ ...settings, whatsapp_number: e.target.value })}
-              placeholder="919849530536"
+              placeholder="918247671857"
               className="w-full bg-canvas-100 border border-eco-200 rounded-xl p-3"
             />
             <div className="mt-1.5 p-2.5 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-2">
               <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
               <p className="text-[11px] text-blue-700">
                 Enter the number in international format <strong>without + or spaces</strong>.<br />
-                Example: <code className="bg-blue-100 px-1 rounded">919849530536</code> (91 = India country code, then 10-digit mobile).<br />
-                This is used to generate the WhatsApp order link: <code className="bg-blue-100 px-1 rounded">wa.me/919849530536</code>
+                Example: <code className="bg-blue-100 px-1 rounded">918247671857</code> (91 = India country code, then 10-digit mobile).<br />
+                This is used to generate the WhatsApp order link: <code className="bg-blue-100 px-1 rounded">wa.me/918247671857</code>
               </p>
             </div>
           </div>

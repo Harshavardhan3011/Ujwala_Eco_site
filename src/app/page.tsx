@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Star,
 } from 'lucide-react';
+import { BUSINESS_PHONE, BUSINESS_TEL, WHATSAPP_LINK } from '@/lib/constants';
 
 export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
@@ -279,12 +280,12 @@ export default function HomePage() {
                   Submit Custom Order Request
                 </Link>
                 <a
-                  href="https://wa.me/919849530536"
+                  href={WHATSAPP_LINK}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-6 py-3 rounded-full shadow-md transition-colors flex items-center gap-1.5"
                 >
-                  <MessageCircle className="w-4 h-4" /> WhatsApp Us (+91 9849530536)
+                  <MessageCircle className="w-4 h-4" /> WhatsApp Us ({BUSINESS_PHONE})
                 </a>
               </div>
             </div>
@@ -474,10 +475,10 @@ export default function HomePage() {
               Shop All Products
             </Link>
             <a
-              href="tel:+919849530536"
+              href={BUSINESS_TEL}
               className="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-6 py-3 rounded-full border border-white/20 transition-colors"
             >
-              Call Factory: +91 9849530536
+              Call Factory: {BUSINESS_PHONE}
             </a>
           </div>
         </div>

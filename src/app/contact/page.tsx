@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { MapPin, Phone, Mail, MessageCircle, Send, CheckCircle2 } from 'lucide-react';
+import { BUSINESS_PHONE, BUSINESS_PHONE_DISPLAY, BUSINESS_TEL, WHATSAPP_LINK } from '@/lib/constants';
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
@@ -42,10 +43,10 @@ export default function ContactPage() {
               <div className="flex items-start gap-3">
                 <Phone className="w-5 h-5 text-jute-400 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Contact Phones:</strong><br />
-                  +91 9849530536<br />
-                  +91 9701347838<br />
-                  +91 8374431924
+                  <strong>Official Contact Phone:</strong><br />
+                  <a href={BUSINESS_TEL} className="hover:underline text-white font-semibold">
+                    {BUSINESS_PHONE_DISPLAY}
+                  </a>
                 </span>
               </div>
 
@@ -61,12 +62,12 @@ export default function ContactPage() {
 
           <div className="pt-4 border-t border-eco-800">
             <a
-              href="https://wa.me/919849530536"
+              href={WHATSAPP_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md"
             >
-              <MessageCircle className="w-4 h-4" /> Direct WhatsApp Chat (+91 9849530536)
+              <MessageCircle className="w-4 h-4" /> Direct WhatsApp Chat ({BUSINESS_PHONE})
             </a>
           </div>
         </div>

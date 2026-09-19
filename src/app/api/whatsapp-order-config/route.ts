@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { executePrivilegedQuery } from '@/lib/serverDb';
+import { WHATSAPP_NUMBER } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export async function GET() {
     const rawNumber =
       (rows[0] as any)?.value ||
       process.env.OWNER_WHATSAPP_NUMBER ||
-      '919849530536';
+      WHATSAPP_NUMBER;
 
     const whatsappNumber = sanitiseNumber(rawNumber);
 
@@ -35,7 +36,7 @@ export async function GET() {
   } catch (err: any) {
     // Fallback to env / default if DB is unavailable
     const fallback = sanitiseNumber(
-      process.env.OWNER_WHATSAPP_NUMBER || '919849530536'
+      process.env.OWNER_WHATSAPP_NUMBER || WHATSAPP_NUMBER
     );
     return NextResponse.json({ whatsappNumber: fallback });
   }

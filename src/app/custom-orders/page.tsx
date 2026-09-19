@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Sparkles, CheckCircle2, MessageCircle, Phone, FileUp, Send } from 'lucide-react';
+import { BUSINESS_PHONE, BUSINESS_TEL, WHATSAPP_LINK } from '@/lib/constants';
 
 export default function CustomOrdersPage() {
   const [formData, setFormData] = useState({
@@ -120,7 +121,7 @@ export default function CustomOrdersPage() {
               <input
                 type="tel"
                 required
-                placeholder="e.g. 9849530536"
+                placeholder="e.g. 8247671857"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full bg-canvas-100 border border-eco-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-1 focus:ring-eco-600"
@@ -244,18 +245,18 @@ export default function CustomOrdersPage() {
         </p>
         <div className="flex flex-wrap justify-center gap-4 pt-2">
           <a
-            href="https://wa.me/919849530536"
+            href={WHATSAPP_LINK}
             target="_blank"
             rel="noopener noreferrer"
             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-full transition-colors flex items-center gap-1.5"
           >
-            <MessageCircle className="w-4 h-4" /> WhatsApp (+91 9849530536)
+            <MessageCircle className="w-4 h-4" /> WhatsApp ({BUSINESS_PHONE})
           </a>
           <a
-            href="tel:+919849530536"
+            href={BUSINESS_TEL}
             className="bg-eco-800 hover:bg-eco-900 text-white text-xs font-bold px-5 py-2.5 rounded-full transition-colors flex items-center gap-1.5"
           >
-            <Phone className="w-4 h-4" /> Call +91 9849530536
+            <Phone className="w-4 h-4" /> Call {BUSINESS_PHONE}
           </a>
         </div>
       </div>

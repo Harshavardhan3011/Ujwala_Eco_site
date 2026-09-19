@@ -36,7 +36,9 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
   const [addedSuccess, setAddedSuccess] = useState(false);
 
   const rawPrimaryImage = product.images?.[0]?.imageUrl || product.image || '/bags/b1.jpeg';
-  const primaryImage = getStorageUrl('products', rawPrimaryImage);
+  const primaryImage = rawPrimaryImage.startsWith('/')
+    ? rawPrimaryImage
+    : getStorageUrl('products', rawPrimaryImage);
 
   const inWishlist = isInWishlist(product.id);
 
@@ -63,13 +65,17 @@ export const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
   return (
     <div className="group bg-white rounded-2xl border border-eco-100 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col h-full">
       {/* Product Image Section */}
-      <div className="relative aspect-4/3 bg-eco-50 overflow-hidden">
+      <div className="relative aspect-[4/3] bg-eco-50 overflow-hidden">
         <Link href={`/products/${product.slug}`} className="block w-full h-full">
           <img
             src={primaryImage}
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/placeholder-product.svg';
+              (e.target as HTMLImageElement).onerror = null;
+            }}
           />
         </Link>
 

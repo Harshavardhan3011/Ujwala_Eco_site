@@ -5,6 +5,7 @@
 
 import tls from 'tls';
 import net from 'net';
+import { BUSINESS_PHONE_DISPLAY, BUSINESS_TEL } from '@/lib/constants';
 
 export interface OrderRequestItemSnapshot {
   product_name: string;
@@ -279,7 +280,7 @@ export function generateCustomerEmailHtml(data: OrderRequestEmailData): string {
     <!-- Footer -->
     <tr>
       <td style="background-color: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b;">
-        Have questions? Contact us at <a href="mailto:${getSellerEmail()}" style="color: #047857; text-decoration: none;">${getSellerEmail()}</a><br/>
+        Have questions? Contact us at <a href="mailto:${getSellerEmail()}" style="color: #047857; text-decoration: none;">${getSellerEmail()}</a> or Call/WhatsApp: <a href="${BUSINESS_TEL}" style="color: #047857; text-decoration: none;">${BUSINESS_PHONE_DISPLAY}</a><br/>
         Ujwala Eco Products • Handcrafted Eco-Friendly Jute Products & Return Gifts
       </td>
     </tr>

@@ -346,7 +346,7 @@ export default function CheckoutPage() {
                 </label>
                 <input
                   type="tel"
-                  placeholder="e.g. +91 9876543210"
+                  placeholder="e.g. +91 8247671857"
                   value={phone}
                   onChange={(e) => {
                     setPhone(e.target.value);
