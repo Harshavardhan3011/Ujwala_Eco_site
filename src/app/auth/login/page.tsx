@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { LogIn, Lock, Mail, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import TurnstileWidget, { isTurnstileConfigured } from '@/components/TurnstileWidget';
 
 function LoginForm() {
   const router = useRouter();
@@ -17,13 +18,21 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const turnstileConfigured = isTurnstileConfigured();
+
+  const handleLogin = async (loginEmail: string, loginPassword: string) => {
+    // Block submission if CAPTCHA is configured but not completed
+    if (turnstileConfigured && !captchaToken) {
+      setErrorMessage('Please complete the security verification.');
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage('');
 
-    const res = await login(email, password);
+    const res = await login(loginEmail, loginPassword, captchaToken || undefined);
     setIsSubmitting(false);
 
     if (res.success) {
@@ -36,31 +45,20 @@ function LoginForm() {
         router.push(redirect);
       }
     } else {
-      setErrorMessage(res.error || 'Login failed');
+      // Map known Supabase CAPTCHA errors to friendly messages
+      const err = res.error || 'Login failed';
+      if (err.toLowerCase().includes('captcha')) {
+        setErrorMessage('Security verification failed. Please try again.');
+        setCaptchaToken(null);
+      } else {
+        setErrorMessage(err);
+      }
     }
   };
 
-  const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
-    setEmail(quickEmail);
-    setPassword(quickPass);
-    setIsSubmitting(true);
-    setErrorMessage('');
-
-    const res = await login(quickEmail, quickPass);
-    setIsSubmitting(false);
-
-    if (res.success) {
-      if (!searchParams.get('redirect')) {
-        const r = res.user?.role?.toLowerCase();
-        if (r === 'superadmin') router.push('/superadmin');
-        else if (r === 'admin') router.push('/admin');
-        else router.push('/account');
-      } else {
-        router.push(redirect);
-      }
-    } else {
-      setErrorMessage(res.error || 'Login failed');
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleLogin(email, password);
   };
 
   return (
@@ -122,10 +120,28 @@ function LoginForm() {
           </div>
         </div>
 
+        {/* Cloudflare Turnstile CAPTCHA */}
+        <div id="turnstile-login-container">
+          <TurnstileWidget
+            onVerify={(token) => {
+              setCaptchaToken(token);
+              setErrorMessage('');
+            }}
+            onExpire={() => {
+              setCaptchaToken(null);
+              setErrorMessage('Security verification expired. Please try again.');
+            }}
+            onError={() => {
+              setCaptchaToken(null);
+              setErrorMessage('Security verification failed. Please try again.');
+            }}
+          />
+        </div>
+
         <button
           type="submit"
-          disabled={isSubmitting}
-          className="w-full bg-eco-700 hover:bg-eco-800 text-white font-bold text-xs py-3 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
+          disabled={isSubmitting || (turnstileConfigured && !captchaToken)}
+          className="w-full bg-eco-700 hover:bg-eco-800 text-white font-bold text-xs py-3 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <LogIn className="w-4 h-4" /> {isSubmitting ? 'Signing In...' : 'Sign In'}
         </button>

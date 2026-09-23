@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json();
+    const { email, password, captchaToken } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
@@ -14,13 +14,30 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Authenticate via Supabase Auth
+    // Authenticate via Supabase Auth — include captchaToken for CAPTCHA verification
     const { data: authData, error: authError } = await db.auth.signInWithPassword({
       email: cleanEmail,
       password,
+      options: {
+        captchaToken: captchaToken || undefined,
+      },
     });
 
-    if (authError || !authData.user) {
+    if (authError) {
+      console.error('Supabase signIn error:', authError.message);
+
+      // Map CAPTCHA-related errors to user-friendly messages
+      if (authError.message.toLowerCase().includes('captcha')) {
+        return NextResponse.json(
+          { error: 'Security verification failed. Please try again.' },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+    }
+
+    if (!authData.user) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
@@ -63,6 +80,7 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error: any) {
     console.error('Login error:', error.message);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
 }
+
