@@ -22,8 +22,17 @@ export function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-export function formatDate(dateString: string | Date): string {
+export function formatDate(dateString: string | Date | null | undefined): string {
+  if (!dateString) return '—';
+
   const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Invalid date value received by formatDate:', dateString);
+    }
+    return '—';
+  }
+
   return new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',
     month: 'short',
