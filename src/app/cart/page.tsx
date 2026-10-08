@@ -10,6 +10,7 @@ import {
 import { formatPrice } from '@/lib/utils';
 import { getStorageUrl } from '@/lib/storage';
 import { WHATSAPP_NUMBER } from '@/lib/constants';
+import { buildWhatsAppOrderUrl } from '@/lib/whatsapp';
 
 interface CustomerForm {
   name: string;
@@ -65,60 +66,23 @@ export default function CartPage() {
     if (!validate()) return;
     setIsOpening(true);
 
-    // Build structured WhatsApp message
-    const lines: string[] = [
-      '🛒 *NEW ORDER — UJWALA ECO PRODUCTS*',
-      '',
-      '━━━━━━━━━━━━━━━━━━━━━━',
-      '*CUSTOMER DETAILS*',
-      `Name: ${form.name}`,
-      `Mobile: ${form.mobile}`,
-    ];
-    if (form.email) lines.push(`Email: ${form.email}`);
-    lines.push(
-      `Address: ${form.address}`,
-      `City: ${form.city}`,
-      `State: ${form.state}`,
-      `Pincode: ${form.pincode}`,
-      '',
-      '━━━━━━━━━━━━━━━━━━━━━━',
-      '*ORDER DETAILS*',
-      '',
-    );
-
-    cartItems.forEach((item, idx) => {
-      const itemSubtotal = item.price * item.quantity;
-      const imageUrl = item.image ? getStorageUrl('products', item.image) : null;
-      lines.push(
-        `${idx + 1}. *${item.productName}*`,
-        `   SKU: ${item.productSku}`,
-        `   Qty: ${item.quantity}`,
-        `   Price: ${formatPrice(item.price)} each`,
-        `   Subtotal: ${formatPrice(itemSubtotal)}`,
-      );
-      if (imageUrl && imageUrl.startsWith('http')) {
-        lines.push(`   Image: ${imageUrl}`);
-      }
-      if (item.customizationNotes) {
-        lines.push(`   Note: ${item.customizationNotes}`);
-      }
-      lines.push('');
+    const url = buildWhatsAppOrderUrl({
+      whatsappNumber: waNumber,
+      customer: {
+        name: form.name,
+        phone: form.mobile,
+        email: form.email,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        note: form.note,
+      },
+      items: cartItems,
+      subtotal,
+      shippingFee,
+      totalAmount,
     });
-
-    lines.push(
-      '━━━━━━━━━━━━━━━━━━━━━━',
-      `Items Subtotal: ${formatPrice(subtotal)}`,
-      `Shipping: ${shippingFee === 0 ? 'FREE' : formatPrice(shippingFee)}`,
-      `*TOTAL: ${formatPrice(totalAmount)}*`,
-    );
-    if (form.note) {
-      lines.push('', '━━━━━━━━━━━━━━━━━━━━━━', `Customer Note: ${form.note}`);
-    }
-    lines.push('', '— Sent from ujwalaeco.com');
-
-    const message = lines.join('\n');
-    const encoded = encodeURIComponent(message);
-    const url = `https://wa.me/${waNumber}?text=${encoded}`;
 
     window.open(url, '_blank', 'noopener,noreferrer');
     setIsOpening(false);

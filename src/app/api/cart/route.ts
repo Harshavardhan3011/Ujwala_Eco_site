@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = getAuthFromRequest(req);
-    const { productId, quantity, customizationNotes, sessionId } = await req.json();
+    const { productId, quantity, customizationNotes, sessionId, mode = 'add' } = await req.json();
 
     if (!productId || !quantity || quantity < 1) {
       return NextResponse.json({ error: 'Invalid product or quantity' }, { status: 400 });
@@ -101,12 +101,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    if (quantity > product.stock_quantity) {
-      return NextResponse.json({
-        error: `Only ${product.stock_quantity} items currently in stock`,
-      }, { status: 400 });
-    }
-
     const userId = session?.userId || null;
     const activeSessionId = session ? null : (sessionId || 'guest-session');
 
@@ -116,6 +110,12 @@ export async function POST(req: NextRequest) {
       : await executePrivilegedQueryOne('SELECT * FROM public.cart_items WHERE product_id = $1 AND session_id = $2;', [productId, activeSessionId]);
 
     if (existingItem) {
+      const nextQuantity = mode === 'set' ? quantity : existingItem.quantity + quantity;
+      if (nextQuantity > product.stock_quantity) {
+        return NextResponse.json({
+          error: `Only ${product.stock_quantity} items currently in stock`,
+        }, { status: 400 });
+      }
       const updated = await executePrivilegedQueryOne(`
         UPDATE public.cart_items
         SET quantity = $1,
@@ -123,10 +123,15 @@ export async function POST(req: NextRequest) {
             updated_at = NOW()
         WHERE id = $3
         RETURNING *;
-      `, [quantity, customizationNotes || null, existingItem.id]);
+      `, [nextQuantity, customizationNotes || null, existingItem.id]);
 
       return NextResponse.json({ item: updated });
     } else {
+      if (quantity > product.stock_quantity) {
+        return NextResponse.json({
+          error: `Only ${product.stock_quantity} items currently in stock`,
+        }, { status: 400 });
+      }
       const newItem = await executePrivilegedQueryOne(`
         INSERT INTO public.cart_items (user_id, session_id, product_id, quantity, customization_notes)
         VALUES ($1, $2, $3, $4, $5)
@@ -146,12 +151,16 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const itemId = searchParams.get('itemId');
     const session = getAuthFromRequest(req);
+    const sessionId = req.headers.get('x-session-id');
 
     if (itemId) {
       await executePrivilegedQuery('DELETE FROM public.cart_items WHERE id = $1;', [itemId]);
       return NextResponse.json({ message: 'Item removed from cart' });
     } else if (session) {
       await executePrivilegedQuery('DELETE FROM public.cart_items WHERE user_id = $1;', [session.userId]);
+      return NextResponse.json({ message: 'Cart cleared' });
+    } else if (sessionId) {
+      await executePrivilegedQuery('DELETE FROM public.cart_items WHERE session_id = $1;', [sessionId]);
       return NextResponse.json({ message: 'Cart cleared' });
     }
 

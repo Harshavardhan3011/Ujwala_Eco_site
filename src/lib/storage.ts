@@ -39,6 +39,12 @@ export function getStorageUrl(bucketOrPath: string, filename?: string): string {
     ) {
       return filename;
     }
+    if (filename.startsWith('/')) {
+      return filename;
+    }
+    if (filename.startsWith('bags/') || filename.startsWith('opening/')) {
+      return `/${filename}`;
+    }
     bucket = bucketOrPath;
     path = filename;
   } else {

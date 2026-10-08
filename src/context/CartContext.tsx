@@ -28,7 +28,7 @@ interface CartContextType {
   isLoading: boolean;
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
-  addToCart: (productId: string, quantity?: number, customizationNotes?: string) => Promise<{ success: boolean; error?: string }>;
+  addToCart: (productId: string, quantity?: number, customizationNotes?: string, replaceExisting?: boolean) => Promise<{ success: boolean; error?: string }>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -94,7 +94,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     fetchCart();
   }, [user]);
 
-  const addToCart = async (productId: string, quantity = 1, customizationNotes?: string) => {
+  const addToCart = async (productId: string, quantity = 1, customizationNotes?: string, replaceExisting = false) => {
     try {
       const sid = getSessionId();
       const res = await fetch('/api/cart', {
@@ -103,7 +103,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           'Content-Type': 'application/json',
           'x-session-id': sid,
         },
-        body: JSON.stringify({ productId, quantity, customizationNotes, sessionId: sid }),
+        body: JSON.stringify({ productId, quantity, customizationNotes, sessionId: sid, mode: replaceExisting ? 'set' : 'add' }),
       });
       const data = await res.json();
 
@@ -141,6 +141,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           quantity,
           customizationNotes: targetItem.customizationNotes,
           sessionId: sid,
+          mode: 'set',
         }),
       });
       await fetchCart();

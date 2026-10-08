@@ -105,7 +105,7 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = async () => {
     setIsAdding(true);
-    const res = await addToCart(product.id, quantity, customizationNotes);
+    const res = await addToCart(product.id, quantity, customizationNotes, true);
     setIsAdding(false);
     if (res.success) {
       router.push('/checkout');

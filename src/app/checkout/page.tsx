@@ -10,6 +10,9 @@ import {
   ArrowLeft, ArrowRight, ShieldCheck, Truck, ShoppingBag, X, Send,
 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
+import { getStorageUrl } from '@/lib/storage';
+import { WHATSAPP_NUMBER } from '@/lib/constants';
+import { buildWhatsAppOrderUrl } from '@/lib/whatsapp';
 
 interface PreviewData {
   items: {
@@ -182,6 +185,26 @@ export default function CheckoutPage() {
         throw new Error(data.error || 'Failed to submit order request.');
       }
 
+      const configResponse = await fetch('/api/whatsapp-order-config');
+      const config = await configResponse.json();
+      const whatsappUrl = buildWhatsAppOrderUrl({
+        whatsappNumber: config.whatsappNumber || WHATSAPP_NUMBER,
+        customer: {
+          name: fullName,
+          phone,
+          email,
+          address: addressLine2 ? `${addressLine1}, ${addressLine2}` : addressLine1,
+          city,
+          state,
+          pincode: postalCode,
+          note: customerNotes || customizationNotes,
+        },
+        items: cartItems,
+        subtotal: Number(data.orderRequest.subtotal),
+        shippingFee: Number(data.orderRequest.deliveryCharge),
+        totalAmount: Number(data.orderRequest.totalAmount),
+      });
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
       clearCart();
       setShowReceiptModal(false);
       setSubmittedOrder(data.orderRequest);
@@ -540,7 +563,7 @@ export default function CheckoutPage() {
               {cartItems.map((item) => (
                 <div key={item.id} className="flex gap-3 py-2 border-b border-eco-50 last:border-0">
                   <img
-                    src={item.image ?? '/placeholder-product.svg'}
+                    src={getStorageUrl('products', item.image ?? '')}
                     alt={item.productName}
                     className="w-12 h-12 object-cover rounded-lg border border-eco-100 shrink-0"
                     onError={(e) => {
