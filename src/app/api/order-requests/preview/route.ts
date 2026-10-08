@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       if (!prod) {
         return NextResponse.json({ error: `Product not found: ${item.productId}` }, { status: 400 });
       }
-      if (prod.product_status && prod.product_status !== 'ACTIVE') {
+      if (prod.product_status && !['ACTIVE', 'IN_STOCK'].includes(prod.product_status)) {
         return NextResponse.json({ error: `Product is unavailable: ${prod.name}` }, { status: 400 });
       }
 

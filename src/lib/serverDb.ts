@@ -433,7 +433,7 @@ export async function createOrderRequestPrivileged(payload: CreateOrderRequestPa
       if (!prod) {
         throw new Error(`Product not found: ${item.productId}`);
       }
-      if (prod.product_status && prod.product_status !== 'ACTIVE') {
+      if (prod.product_status && !['ACTIVE', 'IN_STOCK'].includes(prod.product_status)) {
         throw new Error(`Product is no longer available: ${prod.name}`);
       }
       if (item.quantity < 1) {
